@@ -2,7 +2,7 @@ package com.arrmada360.app.data
 
 import androidx.compose.ui.graphics.Color
 
-enum class AuthKind { API_KEY, USER_PASS, PASSWORD_ONLY }
+enum class AuthKind { API_KEY, USER_PASS, PASSWORD_ONLY, NONE }
 
 enum class Category(val title: String) {
     MEDIA("Media managers"),
@@ -11,6 +11,7 @@ enum class Category(val title: String) {
     REQUESTS("Requests"),
     MONITORING("Monitoring"),
     SERVER("Server"),
+    TOOLS("Tools"),
 }
 
 enum class ServiceType(
@@ -54,7 +55,9 @@ enum class ServiceType(
     TAUTULLI("Tautulli", "Ta", 0xFFE5A00D, 0xFFF97316, "tautulli", 8181, AuthKind.API_KEY, Category.MONITORING, "Plex activity & stats",
         "Tautulli → Settings → Web Interface → API Key"),
     UNRAID("Unraid", "Un", 0xFFF15A2C, 0xFFE11D48, "unraid", 80, AuthKind.API_KEY, Category.SERVER, "Array, Docker & VMs",
-        "Unraid 7.2+: Settings → Management Access → API Keys → create a key (Admin role)");
+        "Unraid 7.2+: Settings → Management Access → API Keys → create a key (Admin role)"),
+    NAMER("Namer", "Nm", 0xFFEC4899, 0xFFA855F7, "namer", 6980, AuthKind.NONE, Category.TOOLS, "ThePornDB renamer",
+        "Namer's web UI (watchdog mode, web = True in namer.cfg). Include web_root in the address if you set one.");
 
     val tint: Color get() = Color(color)
     val tint2: Color get() = Color(color2)

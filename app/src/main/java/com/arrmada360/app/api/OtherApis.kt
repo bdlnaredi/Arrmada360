@@ -566,6 +566,7 @@ object ServiceTester {
         ServiceType.SEERR -> SeerrApi(cfg).status()
         ServiceType.TAUTULLI -> TautulliApi(cfg).status()
         ServiceType.UNRAID -> UnraidApi(cfg).status()
+        ServiceType.NAMER -> NamerApi(cfg).status()
         else -> DownloadClients.of(cfg)?.version() ?: "OK"
     }
 }

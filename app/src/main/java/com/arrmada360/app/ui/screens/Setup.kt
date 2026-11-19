@@ -319,6 +319,7 @@ fun ServiceEditorScreen(
                         PasswordField(pass, { pass = it }, show, { show = !show }, type.keyHint)
                     }
                     AuthKind.PASSWORD_ONLY -> PasswordField(pass, { pass = it }, show, { show = !show }, type.keyHint)
+                    AuthKind.NONE -> Text(type.keyHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { trust = !trust }) {
                     Checkbox(trust, { trust = it })

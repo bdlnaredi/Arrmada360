@@ -171,6 +171,15 @@ Bottom tabs: **Dashboard · Array · Docker · VMs · Shares**
 - **VMs:** start, stop, pause, resume, reboot and force stop.
 - **Shares:** every share with space used and free, and its cache setting.
 
+### Namer (ThePornDB renamer) – optional
+
+Bottom tabs: **Failed · Queue · Server**
+
+Needs Namer running in watchdog mode with its web UI turned on (default port 6980).
+- **Failed**: files Namer couldn't match. Search ThePornDB (Any, Scenes, Movies or JAV), pick the right result and rename, see why a file failed, or delete it.
+- **Queue**: files waiting to be processed.
+- Artwork from ThePornDB is **hidden by default**. Turn it on per instance in the Server tab.
+
 ### Everything else
 
 - **Connection check:** tests every app at once and shows the version and response time, or an error in plain English, for example:
@@ -223,6 +232,7 @@ You can add, edit, reorder or remove apps later in **Settings → Your apps**. L
 | NZBGet | 6789 | *Settings → Security → ControlUsername / ControlPassword* |
 | Overseerr / Jellyseerr | 5055 | *Settings → General → API Key* |
 | Tautulli | 8181 | *Settings → Web Interface → API Key* |
+| Namer | 6980 | No key. Turn on the web UI in `namer.cfg` and include `web_root` in the address if you set one |
 | Unraid 7.2+ | 80 / 443 | *Settings → Management Access → API Keys*. Create a key with the **Admin** role |
 
 ---

@@ -8,6 +8,18 @@ Builds #2, #5, #10, #15, #18 and #19 failed to compile in CI and were fixed stra
 
 ---
 
+## [Unreleased] – next build
+
+### Fixed
+- **Upcoming shows** on the TV Shows tab were empty. The TMDB list used each show's *first* air date, so everything looked old and was filtered out, and the empty result never fell back to another source. Each source is now filtered on its own, TV uses TMDB's "premiering from today" search, Trakt includes new seasons, and Seerr falls back to a date-filtered discover list.
+
+### Added
+- **Namer** (ThePornDB renamer) under a new **Tools** category:
+  - **Failed** files: size, best match %, *Match & rename* (search Any, Scenes, Movies or JAV, pick a result, confirm), and *Show why it failed*.
+  - Delete a file, if Namer allows deleting.
+  - **Queue** with size.
+  - **Server** tab, with an artwork switch. Poster art is **hidden by default**.
+
 ## [1.0.20] – 2026-11-19
 
 ### Added

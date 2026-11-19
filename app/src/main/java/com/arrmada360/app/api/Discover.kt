@@ -193,18 +193,40 @@ object Discover {
 
     suspend fun upcoming(type: String): DiscoverRow<DiscoverItem> {
         val today = LocalDate.now().toString()
+        // Filter inside every source so an empty result falls through to the next source.
+        fun List<DiscoverItem>.future() = filter { it.date.isEmpty() || it.date.take(10) >= today }
         val row = firstOf(
             tr(type) {
                 if (type == "movie") trakt("calendars/all/movies/$today/45", emptyMap()).objects().mapNotNull { w ->
                     w.obj("movie")?.let { traktItem(it, type, date = w.str("released")) }
-                } else trakt("calendars/all/shows/premieres/$today/45", emptyMap()).objects().mapNotNull { w ->
-                    w.obj("show")?.let { traktItem(it, type, extra = "Premiere", date = w.str("first_aired")) }
-                }.distinctBy { it.tmdbId }
+                } else {
+                    // New shows and new seasons premiering in the next 45 days
+                    trakt("calendars/all/shows/premieres/$today/45", emptyMap()).objects().mapNotNull { w ->
+                        val ep = w.obj("episode")
+                        w.obj("show")?.let { traktItem(it, type, extra = if ((ep?.int("season") ?: 1) > 1) "Season ${ep?.int("season")}" else "New show", date = w.str("first_aired")) }
+                    }.distinctBy { it.tmdbId }
+                }
             },
-            tm { tmdb(if (type == "movie") "movie/upcoming" else "tv/on_the_air").arr("results").objects().map { tmdbItem(it, type) } },
-            se { seerrGet(if (type == "movie") "discover/movies/upcoming" else "discover/tv/upcoming", mapOf("page" to 1)).arr("results").objects().mapNotNull { seerrItem(it, type) } },
+            tm {
+                if (type == "movie") {
+                    (tmdb("movie/upcoming").arr("results").objects().map { tmdbItem(it, type) }.future()).ifEmpty {
+                        tmdb("discover/movie", mapOf("primary_release_date.gte" to today, "sort_by" to "popularity.desc")).arr("results").objects().map { tmdbItem(it, type) }
+                    }
+                } else {
+                    tmdb("discover/tv", mapOf("first_air_date.gte" to today, "sort_by" to "popularity.desc", "include_null_first_air_dates" to false))
+                        .arr("results").objects().map { tmdbItem(it, type) }.future()
+                }
+            },
+            se {
+                val path = if (type == "movie") "discover/movies/upcoming" else "discover/tv/upcoming"
+                val first = try { seerrGet(path, mapOf("page" to 1)).arr("results").objects().mapNotNull { seerrItem(it, type) }.future() } catch (e: CancellationException) { throw e } catch (e: Exception) { emptyList() }
+                first.ifEmpty {
+                    val key = if (type == "movie") "primaryReleaseDateGte" else "firstAirDateGte"
+                    seerrGet(if (type == "movie") "discover/movies" else "discover/tv", mapOf("page" to 1, key to today)).arr("results").objects().mapNotNull { seerrItem(it, type) }.future()
+                }
+            },
         )
-        return row.copy(items = row.items.filter { it.date.isEmpty() || it.date >= today }.sortedBy { it.date.ifEmpty { "9999" } }.take(30))
+        return row.copy(items = row.items.future().sortedBy { it.date.ifEmpty { "9999" } }.take(30))
     }
 
     suspend fun people(): DiscoverRow<DiscoverPerson> = firstOf(

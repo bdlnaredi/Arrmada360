@@ -237,6 +237,7 @@ private fun ServiceRoot(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, bac
         cfg.type == ServiceType.SEERR -> SeerrScreen(cfg, nav, isRoot, back)
         cfg.type == ServiceType.TAUTULLI -> TautulliScreen(cfg, nav, isRoot, back)
         cfg.type == ServiceType.UNRAID -> UnraidScreen(cfg, nav, isRoot, back)
+        cfg.type == ServiceType.NAMER -> com.arrmada360.app.ui.screens.NamerScreen(cfg, nav, isRoot, back)
         else -> EmptyBox("Unsupported")
     }
 }
