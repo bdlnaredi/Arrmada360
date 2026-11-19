@@ -1,6 +1,7 @@
 package com.arrmada360.app.ui.screens
 
 import android.content.Intent
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
@@ -127,6 +128,13 @@ fun DashboardScreen(nav: Navigator) {
     androidx.compose.runtime.LaunchedEffect(requested) {
         if (requested != null) { tab = requested.coerceIn(0, 3); pick = 0; com.arrmada360.app.ui.DashboardNav.tab = null }
     }
+    var query by rememberSaveable { mutableStateOf("") }
+    var live by rememberSaveable { mutableStateOf("") }
+    androidx.compose.runtime.LaunchedEffect(query) {
+        kotlinx.coroutines.delay(450) // search automatically once you stop typing
+        live = query.trim()
+    }
+    val searching = live.length >= 2
     val radarrs = services.filter { it.type == ServiceType.RADARR }
     val sonarrs = services.filter { it.type == ServiceType.SONARR }
     val instances = when (tab) { 0 -> radarrs; 1 -> sonarrs; else -> emptyList() }
@@ -134,7 +142,8 @@ fun DashboardScreen(nav: Navigator) {
         title = when (tab) { 0 -> "Movies"; 1 -> "TV Shows"; 2 -> "Calendar"; else -> "Server" },
         subtitle = instances.getOrNull(pick)?.name ?: greeting(),
         isRoot = true, onBack = {},
-        tabs = if (instances.size > 1) instances.map { it.name } else emptyList(), selectedTab = pick, onTab = { pick = it },
+        tabs = if (instances.size > 1 && !searching) instances.map { it.name } else emptyList(), selectedTab = pick, onTab = { pick = it },
+        titleContent = { DashboardSearchBar(query, { query = it }) },
         bottomTabs = listOf(
             BottomTab("Movies", Icons.Filled.Movie),
             BottomTab("TV Shows", Icons.Filled.Tv),
@@ -142,18 +151,15 @@ fun DashboardScreen(nav: Navigator) {
             BottomTab("Server", Icons.Filled.Dns),
         ),
         selectedBottom = tab, onBottom = { tab = it; pick = 0 },
-        actions = {
-            IconButton(onClick = { nav.push(Route.Health) }) { Icon(Icons.Filled.Wifi, "Connection check") }
-            IconButton(onClick = { nav.push(Route.Search()) }) { Icon(Icons.Filled.Search, "Search everything") }
-        },
         fab = {
-            val target = instances.getOrNull(pick)
+            val target = if (searching) null else instances.getOrNull(pick)
             if (target != null) androidx.compose.material3.FloatingActionButton(
                 onClick = { nav.push(Route.ArrAdd(target.id)) }, containerColor = target.type.tint, shape = androidx.compose.foundation.shape.CircleShape,
             ) { Icon(Icons.Filled.Add, "Add") }
         },
     ) { pad ->
         Box(Modifier.padding(pad)) {
+            if (searching) { com.arrmada360.app.ui.screens.SearchResults(live, nav); return@Box }
             when (tab) {
                 0, 1 -> {
                     val c = instances.getOrNull(pick.coerceAtMost((instances.size - 1).coerceAtLeast(0)))
@@ -729,6 +735,34 @@ private fun SeerrCard(nav: Navigator) {
                 StatTile("Processing", d.int("processing").toString(), ServiceType.SEERR.tint, Modifier.weight(1f))
                 StatTile("Available", d.int("available").toString(), Good, Modifier.weight(1f))
             }
+        }
+    }
+}
+
+/** nzb360-style pill search bar in the dashboard's top bar. Searches automatically as you type. */
+@Composable
+private fun DashboardSearchBar(value: String, onChange: (String) -> Unit) {
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    Row(
+        Modifier.padding(end = 12.dp).fillMaxWidth().height(48.dp).clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)).padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(10.dp))
+        Box(Modifier.weight(1f)) {
+            if (value.isEmpty()) Text("Search movies, TV…", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
+            androidx.compose.foundation.text.BasicTextField(
+                value, onChange, singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { focus.clearFocus() }),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (value.isNotEmpty()) IconButton(onClick = { onChange(""); focus.clearFocus() }, modifier = Modifier.size(32.dp)) {
+            Icon(androidx.compose.material.icons.Icons.Filled.Close, "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

@@ -254,7 +254,8 @@ fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
         item {
             SettingsGroup("Settings") {
                 SettingLink(Icons.Filled.Tune, "General settings", "Navigation, interface, IMDb links, security", tint = Rainbow[0]) { nav.push(Route.SettingsGeneral) }
-                SettingLink(Icons.Filled.Wifi, "Connection switching", com.arrmada360.app.net.NetSwitch.describe(), tint = Good) { nav.push(Route.SettingsConnection) }
+                SettingLink(Icons.Filled.Wifi, "Connection check", "Test every app and see what's online", tint = Good) { nav.push(Route.Health) }
+                SettingLink(Icons.Filled.Sync, "Connection switching", com.arrmada360.app.net.NetSwitch.describe(), tint = Accent) { nav.push(Route.SettingsConnection) }
                 SettingLink(Icons.Filled.Notifications, "Notifications", if (ConfigStore.flag(Pref.NOTIFY)) "On – checking your servers in the background" else "Off", tint = Rainbow[3]) { nav.push(Route.SettingsNotifications) }
                 SettingLink(Icons.Filled.Inventory2, "Backup & restore", "Save everything to a .zip or move to a new phone", tint = Good) { nav.push(Route.SettingsBackup) }
                 SettingLink(Icons.Filled.Palette, "Appearance", if (ConfigStore.amoled) "AMOLED black · ${ConfigStore.gridColumns} poster columns" else "Dark · ${ConfigStore.gridColumns} poster columns", tint = Rainbow[2]) { nav.push(Route.SettingsAppearance) }

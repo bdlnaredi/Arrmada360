@@ -246,7 +246,7 @@ fun UniversalSearchScreen(nav: Navigator, initial: String, isRoot: Boolean, back
             UniversalResults(lib.awaitAll().filter { it.second.isNotEmpty() }, look.awaitAll().filter { it.second.isNotEmpty() })
         }
     }
-    AppScaffold(title = "Search everything", isRoot = isRoot, onBack = back) { pad ->
+    AppScaffold(title = "Search", isRoot = isRoot, onBack = back) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().imePadding()) {
             OutlinedTextField(
                 term, { term = it }, singleLine = true, placeholder = { Text("Movies, shows, artists, authors…") },
@@ -286,9 +286,46 @@ private fun MediaRow(items: List<MediaItem>, onClick: (MediaItem) -> Unit) {
     LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         items(items) { m ->
             Column(Modifier.width(104.dp).clickable { onClick(m) }) {
-                Poster(m.poster, Modifier.fillMaxWidth(), fallback = m.title)
+                Box {
+                    Poster(m.poster, Modifier.fillMaxWidth(), fallback = m.title)
+                    if (m.id > 0) Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
+                        com.arrmada360.app.ui.MediaStatusIcon(
+                            when {
+                                m.complete -> com.arrmada360.app.ui.MediaStatus.IN_LIBRARY
+                                m.sizeOnDisk > 0 -> com.arrmada360.app.ui.MediaStatus.LIB_PARTIAL
+                                else -> com.arrmada360.app.ui.MediaStatus.WAITING
+                            }, 22.dp,
+                        )
+                    }
+                }
                 Text(m.title, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
                 if (m.year > 0) Text(m.year.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/** Live results for the dashboard search bar: matches in your libraries, then new titles you can add. */
+@Composable
+fun SearchResults(query: String, nav: Navigator) {
+    val arrs = ConfigStore.services.filter { it.type.isArr }
+    val res = rememberLoadable(query, "dashsearch") {
+        coroutineScope {
+            val lib = arrs.map { c -> async { c to try { ArrApi(c).library().filter { it.title.contains(query, true) }.take(15) } catch (e: Exception) { emptyList() } } }
+            val look = arrs.map { c -> async { c to try { ArrApi(c).lookup(query).filter { it.id == 0 }.take(15) } catch (e: Exception) { emptyList() } } }
+            UniversalResults(lib.awaitAll().filter { it.second.isNotEmpty() }, look.awaitAll().filter { it.second.isNotEmpty() })
+        }
+    }
+    if (arrs.isEmpty()) { EmptyBox("Add Sonarr, Radarr, Lidarr or Readarr to search"); return }
+    LoadableContent(res, empty = { it.library.isEmpty() && it.lookups.isEmpty() }, emptyText = "Nothing found for “$query”") { r ->
+        LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
+            r.library.forEach { (c, items) ->
+                item { SectionTitle("In your ${c.name} library") }
+                item { MediaRow(items) { m -> nav.push(Route.ArrDetail(c.id, m.id)) } }
+            }
+            r.lookups.forEach { (c, items) ->
+                item { SectionTitle("Add to ${c.name}") }
+                item { MediaRow(items) { m -> nav.push(Route.ArrAdd(c.id, m.title)) } }
             }
         }
     }

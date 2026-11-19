@@ -17,6 +17,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -44,6 +45,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Downloading
@@ -230,6 +232,7 @@ fun AppScaffold(
     bottomTabs: List<BottomTab> = emptyList(),
     selectedBottom: Int = 0,
     onBottom: (Int) -> Unit = {},
+    titleContent: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val openDrawer = LocalOpenDrawer.current
@@ -239,6 +242,7 @@ fun AppScaffold(
                 Column {
                     TopAppBar(
                         title = {
+                            if (titleContent != null) titleContent() else
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (badge != null) {
                                     ServiceBadge(badge, 34.dp, badgeName)
@@ -440,7 +444,9 @@ fun PosterTag(text: String, accent: Color = Color.White) {
 /** Media status shown as an icon (no text) on posters. */
 enum class MediaStatus(val icon: androidx.compose.ui.graphics.vector.ImageVector, val color: Color, val label: String) {
     AVAILABLE(androidx.compose.material.icons.Icons.Filled.Check, Color(0xFF22C55E), "Available"),
-    IN_LIBRARY(androidx.compose.material.icons.Icons.Filled.Check, Color(0xFF22C55E), "In your library"),
+    IN_LIBRARY(androidx.compose.material.icons.Icons.Filled.Check, Color(0xFF22C55E), "Downloaded – on your server"),
+    LIB_PARTIAL(androidx.compose.material.icons.Icons.Filled.Contrast, Color(0xFF0EA5E9), "Partly downloaded"),
+    WAITING(androidx.compose.material.icons.Icons.Filled.HourglassTop, Color(0xFFF97316), "In library – not downloaded yet"),
     PARTIAL(androidx.compose.material.icons.Icons.Filled.Contrast, Color(0xFF0EA5E9), "Partially available"),
     PROCESSING(androidx.compose.material.icons.Icons.Filled.Downloading, Color(0xFFF59E0B), "Processing / downloading"),
     REQUESTED(androidx.compose.material.icons.Icons.Filled.Schedule, Color(0xFFA855F7), "Requested – waiting"),
@@ -465,8 +471,8 @@ fun MediaStatusIcon(status: MediaStatus, size: Dp = 26.dp) {
 /** Small key explaining the status icons. */
 @Composable
 fun StatusLegend(modifier: Modifier = Modifier) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        listOf(MediaStatus.AVAILABLE to "Available", MediaStatus.PARTIAL to "Partial", MediaStatus.PROCESSING to "Processing", MediaStatus.REQUESTED to "Requested").forEach { (s, l) ->
+    Row(modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        listOf(MediaStatus.IN_LIBRARY to "Downloaded", MediaStatus.LIB_PARTIAL to "Partial", MediaStatus.WAITING to "Waiting", MediaStatus.PROCESSING to "Processing", MediaStatus.REQUESTED to "Requested").forEach { (s, l) ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 MediaStatusIcon(s, 18.dp)
                 Spacer(Modifier.width(4.dp))

@@ -92,7 +92,17 @@ import com.arrmada360.app.ui.shimmer
 
 /** Library lookup so discovery tiles can show "in library" and jump straight to the item. */
 private class LibIndex(val byTmdb: Map<Int, Int>, val byTvdb: Map<Int, Int>, val items: List<MediaItem>) {
+    private val byId = items.associateBy { it.id }
     fun find(i: DiscoverItem): Int? = byTmdb[i.tmdbId] ?: if (i.tvdbId > 0) byTvdb[i.tvdbId] else null
+    /** Downloaded / partly downloaded / added but waiting – or null when not in the library. */
+    fun status(i: DiscoverItem): MediaStatus? {
+        val m = find(i)?.let { byId[it] } ?: return null
+        return when {
+            m.complete -> MediaStatus.IN_LIBRARY
+            m.sizeOnDisk > 0 || m.progressText.substringBefore("/").trim().toIntOrNull()?.let { it > 0 } == true -> MediaStatus.LIB_PARTIAL
+            else -> MediaStatus.WAITING
+        }
+    }
 }
 
 /** The Movies / TV Shows tab on the dashboard: rows of things to discover, like nzb360. */
@@ -220,7 +230,7 @@ private fun HeroRow(l: Loadable<DiscoverRow<DiscoverItem>>, title: String, lib: 
                         if (i.year.isNotEmpty()) Text(i.year, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f))
                         if (i.rating > 0) PosterTag("★ %.1f".format(i.rating), Warn)
                         if (i.extra.isNotEmpty()) PosterTag(i.extra, MaterialTheme.colorScheme.primary)
-                        val st = if (lib?.find(i) != null) MediaStatus.IN_LIBRARY else MediaStatus.fromSeerr(i.seerrStatus)
+                        val st = lib?.status(i) ?: MediaStatus.fromSeerr(i.seerrStatus)
                         if (st != null) MediaStatusIcon(st, 24.dp)
                     }
                 }
@@ -252,17 +262,17 @@ private fun ItemRow(
     RowHeader(title, icon, color, d?.source)
     if (d == null) { ShimmerRow(); return }
     LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(d.items, key = { title + it.tmdbId + it.title }) { i -> PosterCard(i, color, lib?.find(i) != null, showDate) { onClick(i) } }
+        items(d.items, key = { title + it.tmdbId + it.title }) { i -> PosterCard(i, color, lib?.status(i), showDate) { onClick(i) } }
     }
 }
 
 @Composable
-private fun PosterCard(i: DiscoverItem, color: Color, inLib: Boolean, showDate: Boolean, onClick: () -> Unit) {
+private fun PosterCard(i: DiscoverItem, color: Color, libStatus: MediaStatus?, showDate: Boolean, onClick: () -> Unit) {
     Column(Modifier.width(120.dp).clickable(onClick = onClick)) {
         Box(Modifier.clip(RoundedCornerShape(12.dp)).border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(12.dp))) {
             Poster(i.poster, Modifier.fillMaxWidth(), corner = 12.dp, fallback = i.title)
             if (i.rating > 0) Box(Modifier.align(Alignment.TopStart).padding(5.dp)) { PosterTag("★ %.1f".format(i.rating), Warn) }
-            val st = if (inLib) MediaStatus.IN_LIBRARY else MediaStatus.fromSeerr(i.seerrStatus)
+            val st = libStatus ?: MediaStatus.fromSeerr(i.seerrStatus)
             if (st != null) Box(Modifier.align(Alignment.TopEnd).padding(5.dp)) { MediaStatusIcon(st) }
             if (showDate && i.date.isNotEmpty()) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)))).padding(6.dp)) {
                 Text(relativeDay(parseDate(i.date)), style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
@@ -372,7 +382,12 @@ private fun DiscoverSheet(i: DiscoverItem, isMovie: Boolean, lib: LibIndex?, nav
                 if (i.overview.isNotEmpty()) Text(i.overview, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val firstArr = arrs.firstOrNull()
                 if (libId != null && firstArr != null) {
-                    GradientButton("✓ In your library – open", Modifier.fillMaxWidth()) { onDismiss(); nav.push(Route.ArrDetail(firstArr.id, libId)) }
+                    val st = lib?.status(i) ?: MediaStatus.IN_LIBRARY
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        MediaStatusIcon(st, 24.dp); Spacer(Modifier.width(8.dp))
+                        Text(st.label, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    GradientButton("Open in ${firstArr.name}", Modifier.fillMaxWidth()) { onDismiss(); nav.push(Route.ArrDetail(firstArr.id, libId)) }
                 } else {
                     arrs.forEach { a ->
                         GradientButton("+ Add to ${a.name}", Modifier.fillMaxWidth()) {

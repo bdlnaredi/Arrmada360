@@ -8,6 +8,18 @@ Builds #2, #5, #10, #15, #18 and #19 failed to compile in CI and were fixed stra
 
 ---
 
+## [Unreleased] – next build
+
+### Changed
+- **Dashboard search bar**: the search button is now a search bar in the top bar ("Search movies, TV…") that **searches automatically as you type**. Results show matches already in your libraries first, then new titles you can add.
+- **Status marks now say whether a title is actually downloaded**:
+  - ✓ green: **downloaded** (on your server)
+  - ◐ blue: **partly downloaded** (e.g. some episodes)
+  - ⌛ orange: **in your library but not downloaded yet**
+  - Seerr's ⬇ processing and 🕒 requested icons are unchanged.
+  - The legend and the title sheet ("Open in Radarr") show the same states.
+- **Removed** the connection-check button from the dashboard, and *Search everything* and *Connection check* from the side menu. **Connection check** now lives in **Settings**.
+
 ## [1.0.24] – 2026-11-19
 
 ### Changed

@@ -274,14 +274,6 @@ private fun DrawerContent(current: Route, go: (Route) -> Unit) {
                     label = { Text("Dashboard") }, selected = current == Route.Dashboard,
                     icon = { Icon(Icons.Filled.Dashboard, null, tint = Accent) }, onClick = { go(Route.Dashboard) }, colors = colors,
                 )
-                NavigationDrawerItem(
-                    label = { Text("Search everything") }, selected = current is Route.Search,
-                    icon = { Icon(Icons.Filled.Search, null, tint = Accent2) }, onClick = { go(Route.Search()) }, colors = colors,
-                )
-                NavigationDrawerItem(
-                    label = { Text("Connection check") }, selected = current == Route.Health,
-                    icon = { Icon(Icons.Filled.Wifi, null, tint = Good) }, onClick = { go(Route.Health) }, colors = colors,
-                )
                 Category.entries.forEach { cat ->
                     val list = ConfigStore.services.filter { it.type.category == cat }
                     if (list.isNotEmpty()) {
