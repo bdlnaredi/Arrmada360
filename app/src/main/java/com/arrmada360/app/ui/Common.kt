@@ -51,6 +51,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -309,7 +310,7 @@ fun BottomTabs(tabs: List<BottomTab>, selected: Int, onSelect: (Int) -> Unit) {
         androidx.compose.material3.NavigationBar(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f), tonalElevation = 0.dp) {
             tabs.forEachIndexed { i, t ->
                 val on = i == selected
-                androidx.compose.material3.NavigationBarItem(
+                NavigationBarItem(
                     selected = on,
                     onClick = { onSelect(i) },
                     icon = { Icon(t.icon, t.label) },
