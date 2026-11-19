@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.RssFeed
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Download
@@ -124,6 +125,10 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
             com.arrmada360.app.ui.BottomTab("Queue", androidx.compose.material.icons.Icons.Filled.Download),
             com.arrmada360.app.ui.BottomTab("History", androidx.compose.material.icons.Icons.Filled.History),
             com.arrmada360.app.ui.BottomTab("Server", androidx.compose.material.icons.Icons.Filled.Dns),
+        ) else if (client is com.arrmada360.app.api.RssClient) listOf(
+            com.arrmada360.app.ui.BottomTab("Torrents", androidx.compose.material.icons.Icons.Filled.Download),
+            com.arrmada360.app.ui.BottomTab("RSS", androidx.compose.material.icons.Icons.Filled.RssFeed),
+            com.arrmada360.app.ui.BottomTab("Server", androidx.compose.material.icons.Icons.Filled.Dns),
         ) else listOf(
             com.arrmada360.app.ui.BottomTab("Torrents", androidx.compose.material.icons.Icons.Filled.Download),
             com.arrmada360.app.ui.BottomTab("Server", androidx.compose.material.icons.Icons.Filled.Dns),
@@ -164,9 +169,12 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
         fab = { if (tab == 0 && selection.isEmpty()) FloatingActionButton(onClick = { addOpen = true }, containerColor = MaterialTheme.colorScheme.primary) { Icon(Icons.Filled.Add, "Add") } },
     ) { pad ->
         Column(Modifier.padding(pad)) {
-            val serverTab = if (client.hasHistory) 2 else 1
+            val hasRss = client is com.arrmada360.app.api.RssClient
+            val serverTab = if (client.hasHistory || hasRss) 2 else 1
             if (tab == serverTab) {
                 DownloaderServerTab(cfg, nav)
+            } else if (tab == 1 && hasRss) {
+                RssTab(cfg, client)
             } else if (tab == 1) {
                 val h = rememberLoadable(cfg, "history") { client.history() }
                 LoadableContent(h, empty = { it.isEmpty() }, emptyText = "No history") { list ->

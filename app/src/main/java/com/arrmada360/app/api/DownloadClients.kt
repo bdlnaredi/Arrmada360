@@ -45,6 +45,66 @@ data class DlItem(
 
 data class DlSnapshot(val items: List<DlItem>, val dlSpeed: Long, val upSpeed: Long, val globalPaused: Boolean = false, val freeSpace: Long = -1)
 
+data class RssArticle(
+    val id: String,
+    val title: String,
+    val torrentUrl: String,
+    val page: String,
+    val date: String, // ISO-8601 when it can be parsed
+    val read: Boolean,
+    val description: String,
+    val feedKey: String,
+    val feedName: String,
+)
+
+data class RssFeed(
+    val key: String, // qBittorrent item path / ruTorrent feed hash
+    val name: String,
+    val url: String,
+    val articles: List<RssArticle>,
+    val error: Boolean,
+    val loading: Boolean,
+    val lastUpdate: String,
+)
+
+data class RssRule(
+    val name: String,
+    val enabled: Boolean,
+    val mustContain: String,
+    val mustNotContain: String,
+    val useRegex: Boolean,
+    val episodeFilter: String,
+    val feeds: List<String>,
+    val category: String,
+    val savePath: String,
+    val lastMatch: String,
+    val raw: JSONObject,
+)
+
+/** Download clients with a built-in RSS reader. */
+interface RssClient {
+    val hasRules: Boolean get() = false
+    suspend fun rssFeeds(): List<RssFeed>
+    suspend fun rssAddFeed(url: String, name: String)
+    suspend fun rssRemoveFeed(feed: RssFeed)
+    suspend fun rssRefresh(feed: RssFeed?)
+    suspend fun rssMarkRead(feed: RssFeed?, article: RssArticle?) {}
+    suspend fun rssDownload(article: RssArticle)
+    suspend fun rssRules(): List<RssRule> = emptyList()
+    suspend fun rssSaveRule(name: String, def: JSONObject) {}
+    suspend fun rssRemoveRule(name: String) {}
+    suspend fun rssRuleMatches(name: String): List<String> = emptyList()
+    suspend fun rssSettings(): Pair<Boolean, Boolean>? = null // reader on, auto-download on
+    suspend fun rssSetSettings(reader: Boolean, autoDownload: Boolean) {}
+}
+
+/** RSS dates are RFC-1123 ("Thu, 19 Nov 2026 10:00:00 +0000"); turn them into ISO so they sort. */
+fun rssDate(raw: String): String = try {
+    java.time.ZonedDateTime.parse(raw.trim(), java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toString()
+} catch (e: Exception) {
+    try { java.time.OffsetDateTime.parse(raw.trim()).toInstant().toString() } catch (e2: Exception) { raw }
+}
+
 data class DlHistory(val name: String, val status: String, val size: Long, val time: Long, val failed: Boolean)
 
 interface DownloadClient {
@@ -91,7 +151,7 @@ object DownloadClients {
 private fun etaOf(left: Long, speed: Long): Long = if (speed > 0) left / speed else -1
 
 // ======================= qBittorrent =======================
-class QbitClient(override val cfg: ServiceConfig) : DownloadClient {
+class QbitClient(override val cfg: ServiceConfig) : DownloadClient, RssClient {
     private val jar = MemoryCookieJar()
     private val client: OkHttpClient = Http.client(cfg.trustAllCerts).newBuilder().cookieJar(jar).build()
     private var loggedIn = false
@@ -179,6 +239,79 @@ class QbitClient(override val cfg: ServiceConfig) : DownloadClient {
     suspend fun forceStart(ids: List<String>) { call("torrents/setForceStart", mapOf("hashes" to ids.joinToString("|"), "value" to "true")) }
     suspend fun toggleAltSpeed() { call("transfer/toggleSpeedLimitsMode", emptyMap()) }
     suspend fun altSpeedOn(): Boolean = call("transfer/speedLimitsMode").trim() == "1"
+    // ---------------- RSS ----------------
+    override val hasRules = true
+
+    override suspend fun rssFeeds(): List<RssFeed> {
+        val root = JSONObject(call("rss/items?withData=true"))
+        val out = mutableListOf<RssFeed>()
+        fun walk(o: JSONObject, prefix: String) {
+            o.keys().asSequence().toList().forEach { name ->
+                val v = o.optJSONObject(name) ?: return@forEach
+                val path = if (prefix.isEmpty()) name else "$prefix\\$name"
+                if (v.has("url") || v.has("uid")) {
+                    val title = v.str("title").ifEmpty { name }
+                    out += RssFeed(
+                        key = path, name = name, url = v.str("url"),
+                        articles = v.arr("articles").objects().map { a ->
+                            RssArticle(
+                                id = a.str("id"), title = a.str("title"),
+                                torrentUrl = a.str("torrentURL").ifEmpty { a.str("link") }, page = a.str("link"),
+                                date = rssDate(a.str("date")), read = a.bool("isRead"), description = a.str("description"),
+                                feedKey = path, feedName = name,
+                            )
+                        },
+                        error = v.bool("hasError"), loading = v.bool("isLoading"), lastUpdate = rssDate(v.str("lastBuildDate")),
+                    ).also { if (title.isEmpty()) Unit }
+                } else walk(v, path)
+            }
+        }
+        walk(root, "")
+        return out
+    }
+
+    override suspend fun rssAddFeed(url: String, name: String) {
+        call("rss/addFeed", mapOf("url" to url, "path" to name.trim()))
+    }
+    override suspend fun rssRemoveFeed(feed: RssFeed) { call("rss/removeItem", mapOf("path" to feed.key)) }
+    override suspend fun rssRefresh(feed: RssFeed?) {
+        if (feed != null) call("rss/refreshItem", mapOf("itemPath" to feed.key))
+        else rssFeeds().forEach { call("rss/refreshItem", mapOf("itemPath" to it.key)) }
+    }
+    override suspend fun rssMarkRead(feed: RssFeed?, article: RssArticle?) {
+        when {
+            article != null -> call("rss/markAsRead", mapOf("itemPath" to article.feedKey, "articleId" to article.id))
+            feed != null -> call("rss/markAsRead", mapOf("itemPath" to feed.key))
+            else -> rssFeeds().forEach { call("rss/markAsRead", mapOf("itemPath" to it.key)) }
+        }
+    }
+    override suspend fun rssDownload(article: RssArticle) { addUrl(article.torrentUrl) }
+
+    override suspend fun rssRules(): List<RssRule> {
+        val o = JSONObject(call("rss/rules"))
+        return o.keys().asSequence().toList().mapNotNull { name ->
+            val r = o.optJSONObject(name) ?: return@mapNotNull null
+            RssRule(
+                name = name, enabled = r.bool("enabled"), mustContain = r.str("mustContain"), mustNotContain = r.str("mustNotContain"),
+                useRegex = r.bool("useRegex"), episodeFilter = r.str("episodeFilter"),
+                feeds = r.arr("affectedFeeds").let { a -> (0 until a.length()).map { a.optString(it) } },
+                category = r.str("assignedCategory"), savePath = r.str("savePath"), lastMatch = r.str("lastMatch"), raw = r,
+            )
+        }.sortedBy { it.name.lowercase() }
+    }
+    override suspend fun rssSaveRule(name: String, def: JSONObject) { call("rss/setRule", mapOf("ruleName" to name, "ruleDef" to def.toString())) }
+    override suspend fun rssRemoveRule(name: String) { call("rss/removeRule", mapOf("ruleName" to name)) }
+    override suspend fun rssRuleMatches(name: String): List<String> {
+        val o = JSONObject(call("rss/matchingArticles?ruleName=" + java.net.URLEncoder.encode(name, "UTF-8")))
+        return o.keys().asSequence().toList().flatMap { feed -> o.arr(feed).let { a -> (0 until a.length()).map { a.optString(it) } } }
+    }
+    override suspend fun rssSettings(): Pair<Boolean, Boolean> {
+        val p = JSONObject(call("app/preferences"))
+        return p.bool("rss_processing_enabled") to p.bool("rss_auto_downloading_enabled")
+    }
+    override suspend fun rssSetSettings(reader: Boolean, autoDownload: Boolean) {
+        call("app/setPreferences", mapOf("json" to JSONObject().put("rss_processing_enabled", reader).put("rss_auto_downloading_enabled", autoDownload).toString()))
+    }
 }
 
 // ======================= Transmission =======================
@@ -325,7 +458,7 @@ class DelugeClient(override val cfg: ServiceConfig) : DownloadClient {
 }
 
 // ======================= ruTorrent (httprpc plugin) =======================
-class RutorrentClient(override val cfg: ServiceConfig) : DownloadClient {
+class RutorrentClient(override val cfg: ServiceConfig) : DownloadClient, RssClient {
     private val client = Http.client(cfg.trustAllCerts)
 
     private suspend fun post(path: String, form: List<Pair<String, String>>): String {
@@ -384,6 +517,34 @@ class RutorrentClient(override val cfg: ServiceConfig) : DownloadClient {
     override suspend fun resumeAll() { resume(snapshot().items.map { it.id }) }
     override suspend fun delete(ids: List<String>, withData: Boolean) { action(if (withData) "removewithdata" else "remove", ids) }
     override suspend fun addUrl(url: String) { post("php/addtorrent.php", listOf("url" to url)) }
+    // ---------------- RSS (ruTorrent "rss" plugin) ----------------
+    override suspend fun rssFeeds(): List<RssFeed> {
+        val o = JSONObject(post("plugins/rss/action.php", listOf("mode" to "get")))
+        val list = o.optJSONArray("list") ?: o.optJSONArray("rss") ?: o.optJSONArray("feeds") ?: JSONArray()
+        return list.objects().map { f ->
+            val key = f.str("hash")
+            val name = f.str("label").ifEmpty { f.str("url") }
+            RssFeed(
+                key = key, name = name, url = f.str("url"),
+                articles = f.arr("items").objects().map { a ->
+                    val t = a.long("time")
+                    RssArticle(
+                        id = a.str("guid").ifEmpty { a.str("href") }, title = a.str("title"),
+                        torrentUrl = a.str("href"), page = a.str("guid").takeIf { it.startsWith("http") } ?: a.str("href"),
+                        date = if (t > 0) java.time.Instant.ofEpochSecond(t).toString() else "", read = false, description = "",
+                        feedKey = key, feedName = name,
+                    )
+                },
+                error = f.int("errcount") > 0 || f.has("error"), loading = false, lastUpdate = "",
+            )
+        }
+    }
+    override suspend fun rssAddFeed(url: String, name: String) { post("plugins/rss/action.php", listOf("mode" to "add", "url" to url, "label" to name)) }
+    override suspend fun rssRemoveFeed(feed: RssFeed) { post("plugins/rss/action.php", listOf("mode" to "remove", "rss" to feed.key)) }
+    override suspend fun rssRefresh(feed: RssFeed?) {
+        post("plugins/rss/action.php", if (feed != null) listOf("mode" to "refresh", "rss" to feed.key) else listOf("mode" to "refresh"))
+    }
+    override suspend fun rssDownload(article: RssArticle) { addUrl(article.torrentUrl) }
 }
 
 // ======================= SABnzbd =======================
