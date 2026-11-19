@@ -120,6 +120,11 @@ interface DownloadClient {
     suspend fun history(): List<DlHistory> = emptyList()
     val hasHistory: Boolean get() = false
     val isUsenet: Boolean get() = false
+    /** Categories (qBittorrent) / labels (ruTorrent). */
+    val supportsCategories: Boolean get() = false
+    suspend fun categories(): List<String> = emptyList()
+    suspend fun setCategory(ids: List<String>, cat: String) {}
+    suspend fun createCategory(name: String, savePath: String) {}
 }
 
 object DownloadClients {
@@ -233,8 +238,12 @@ class QbitClient(override val cfg: ServiceConfig) : DownloadClient, RssClient {
         call("torrents/add", mapOf("urls" to url), multipart = true)
     }
 
-    suspend fun categories(): List<String> = try { JSONObject(call("torrents/categories")).keys().asSequence().toList() } catch (e: Exception) { emptyList() }
-    suspend fun setCategory(ids: List<String>, cat: String) { call("torrents/setCategory", mapOf("hashes" to ids.joinToString("|"), "category" to cat)) }
+    override val supportsCategories = true
+    override suspend fun categories(): List<String> = try { JSONObject(call("torrents/categories")).keys().asSequence().toList().sortedBy { it.lowercase() } } catch (e: Exception) { emptyList() }
+    override suspend fun setCategory(ids: List<String>, cat: String) { call("torrents/setCategory", mapOf("hashes" to ids.joinToString("|"), "category" to cat)) }
+    override suspend fun createCategory(name: String, savePath: String) {
+        try { call("torrents/createCategory", mapOf("category" to name, "savePath" to savePath)) } catch (e: ApiException) { if (e.code != 409) throw e }
+    }
     suspend fun recheck(ids: List<String>) { call("torrents/recheck", mapOf("hashes" to ids.joinToString("|"))) }
     suspend fun forceStart(ids: List<String>) { call("torrents/setForceStart", mapOf("hashes" to ids.joinToString("|"), "value" to "true")) }
     suspend fun toggleAltSpeed() { call("transfer/toggleSpeedLimitsMode", emptyMap()) }
@@ -517,6 +526,13 @@ class RutorrentClient(override val cfg: ServiceConfig) : DownloadClient, RssClie
     override suspend fun resumeAll() { resume(snapshot().items.map { it.id }) }
     override suspend fun delete(ids: List<String>, withData: Boolean) { action(if (withData) "removewithdata" else "remove", ids) }
     override suspend fun addUrl(url: String) { post("php/addtorrent.php", listOf("url" to url)) }
+
+    override val supportsCategories = true
+    override suspend fun categories(): List<String> = snapshot().items.map { it.category }.filter { it.isNotEmpty() }.distinct().sortedBy { it.lowercase() }
+    override suspend fun setCategory(ids: List<String>, cat: String) {
+        post("plugins/httprpc/action.php", listOf("mode" to "setlabel", "s" to "label", "v" to cat) + ids.map { "hash" to it })
+    }
+    override suspend fun createCategory(name: String, savePath: String) { /* ruTorrent labels exist once a torrent uses them */ }
     // ---------------- RSS (ruTorrent "rss" plugin) ----------------
     override suspend fun rssFeeds(): List<RssFeed> {
         val o = JSONObject(post("plugins/rss/action.php", listOf("mode" to "get")))

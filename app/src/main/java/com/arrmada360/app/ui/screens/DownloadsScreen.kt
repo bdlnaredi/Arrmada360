@@ -1,6 +1,14 @@
 package com.arrmada360.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import com.arrmada360.app.ui.Rainbow
+import com.arrmada360.app.ui.StatusDot
 import androidx.compose.foundation.border
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -105,6 +113,12 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
     var filter by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
     var sort by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
     var selection by remember { mutableStateOf(setOf<String>()) }
+    var selectMode by remember { mutableStateOf(false) }
+    var visibleIds by remember { mutableStateOf(listOf<String>()) }
+    var catFor by remember { mutableStateOf<List<String>?>(null) }
+    var catFilter by rememberSaveable(cfg.id + "cat") { mutableStateOf<String?>(null) }
+    var selMenu by remember { mutableStateOf(false) }
+    val selecting = selectMode || selection.isNotEmpty()
     var action by remember { mutableStateOf<DlItem?>(null) }
     var addOpen by remember { mutableStateOf(false) }
     var deleteIds by remember { mutableStateOf<List<String>?>(null) }
@@ -117,10 +131,10 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
     val refresh = { snap.load(true) }
 
     AppScaffold(
-        title = if (selection.isNotEmpty()) "${selection.size} selected" else cfg.name,
-        subtitle = if (selection.isEmpty()) subtitle else null,
-        isRoot = isRoot && selection.isEmpty(), onBack = { if (selection.isNotEmpty()) selection = emptySet() else back() },
-        badge = if (selection.isEmpty()) cfg.type else null, badgeName = cfg.name,
+        title = if (selecting) "${selection.size} selected" else cfg.name,
+        subtitle = if (!selecting) subtitle else "Tap items to select",
+        isRoot = isRoot && !selecting, onBack = { if (selecting) { selection = emptySet(); selectMode = false } else back() },
+        badge = if (!selecting) cfg.type else null, badgeName = cfg.name,
         bottomTabs = if (client.hasHistory) listOf(
             com.arrmada360.app.ui.BottomTab("Queue", androidx.compose.material.icons.Icons.Filled.Download),
             com.arrmada360.app.ui.BottomTab("History", androidx.compose.material.icons.Icons.Filled.History),
@@ -135,11 +149,26 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
         ),
         selectedBottom = tab, onBottom = { tab = it },
         actions = {
-            if (selection.isNotEmpty()) {
-                IconButton(onClick = { val ids = selection.toList(); run("Resumed", refresh) { client.resume(ids) } }) { Icon(Icons.Filled.PlayArrow, "Resume") }
-                IconButton(onClick = { val ids = selection.toList(); run("Paused", refresh) { client.pause(ids) } }) { Icon(Icons.Filled.Pause, "Pause") }
-                IconButton(onClick = { deleteIds = selection.toList() }) { Icon(Icons.Filled.Delete, "Delete") }
-                IconButton(onClick = { selection = s?.items?.map { it.id }?.toSet() ?: emptySet() }) { Icon(Icons.Filled.SelectAll, "Select all") }
+            if (selecting) {
+                val none = selection.isEmpty()
+                IconButton(enabled = !none, onClick = { val ids = selection.toList(); run("Resumed ${ids.size}", refresh) { client.resume(ids) } }) { Icon(Icons.Filled.PlayArrow, "Resume") }
+                IconButton(enabled = !none, onClick = { val ids = selection.toList(); run("Paused ${ids.size}", refresh) { client.pause(ids) } }) { Icon(Icons.Filled.Pause, "Pause") }
+                if (client.supportsCategories) IconButton(enabled = !none, onClick = { catFor = selection.toList() }) { Icon(Icons.AutoMirrored.Filled.Label, "Category") }
+                IconButton(enabled = !none, onClick = { deleteIds = selection.toList() }) { Icon(Icons.Filled.Delete, "Delete") }
+                Box {
+                    IconButton(onClick = { selMenu = true }) { Icon(Icons.Filled.MoreVert, "More") }
+                    DropdownMenu(selMenu, { selMenu = false }) {
+                        DropdownMenuItem(text = { Text("Select all shown (${visibleIds.size})") }, leadingIcon = { Icon(Icons.Filled.SelectAll, null) }, onClick = { selMenu = false; selection = selection + visibleIds })
+                        DropdownMenuItem(text = { Text("Invert selection") }, onClick = { selMenu = false; selection = visibleIds.filter { it !in selection }.toSet() })
+                        DropdownMenuItem(text = { Text("Select none") }, onClick = { selMenu = false; selection = emptySet() })
+                        val c = client
+                        if (c is QbitClient && !none) {
+                            DropdownMenuItem(text = { Text("Force start") }, onClick = { selMenu = false; val ids = selection.toList(); run("Force started", refresh) { c.forceStart(ids) } })
+                            DropdownMenuItem(text = { Text("Force recheck") }, onClick = { selMenu = false; val ids = selection.toList(); run("Recheck started", refresh) { c.recheck(ids) } })
+                        }
+                        DropdownMenuItem(text = { Text("Done") }, onClick = { selMenu = false; selection = emptySet(); selectMode = false })
+                    }
+                }
             } else {
                 IconButton(onClick = {
                     if (s?.globalPaused == true) run("Resumed all", refresh) { client.resumeAll() } else run("Paused all", refresh) { client.pauseAll() }
@@ -155,6 +184,8 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "More") }
                     DropdownMenu(menu, { menu = false }) {
+                        DropdownMenuItem(text = { Text("Select multiple") }, leadingIcon = { Icon(Icons.Filled.Checklist, null) }, onClick = { menu = false; selectMode = true })
+                        if (client.supportsCategories) DropdownMenuItem(text = { Text("Manage categories") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, null) }, onClick = { menu = false; catFor = emptyList() })
                         DropdownMenuItem(text = { Text("Resume all") }, onClick = { menu = false; run("Resumed all", refresh) { client.resumeAll() } })
                         DropdownMenuItem(text = { Text("Pause all") }, onClick = { menu = false; run("Paused all", refresh) { client.pauseAll() } })
                         if (client is QbitClient) DropdownMenuItem(text = { Text("Toggle alternative speed limits") }, leadingIcon = { Icon(Icons.Filled.Speed, null) },
@@ -166,7 +197,7 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
                 }
             }
         },
-        fab = { if (tab == 0 && selection.isEmpty()) FloatingActionButton(onClick = { addOpen = true }, containerColor = MaterialTheme.colorScheme.primary) { Icon(Icons.Filled.Add, "Add") } },
+        fab = { if (tab == 0 && !selecting) FloatingActionButton(onClick = { addOpen = true }, containerColor = MaterialTheme.colorScheme.primary) { Icon(Icons.Filled.Add, "Add") } },
     ) { pad ->
         Column(Modifier.padding(pad)) {
             val hasRss = client is com.arrmada360.app.api.RssClient
@@ -207,9 +238,15 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
                 }
                 SpeedHeader(cfg, client.isUsenet, s)
                 ChipRow(filters, filter, { filter = it }, Modifier.padding(vertical = 8.dp), counts = filters.map { f -> all.count { matches(f, it) } })
+                val cats = all.map { it.category }.filter { it.isNotEmpty() }.distinct().sorted()
+                if (cats.isNotEmpty()) {
+                    val catNames = listOf("Any category") + cats
+                    ChipRow(catNames, catFilter?.let { cats.indexOf(it) + 1 } ?: 0, { i -> catFilter = if (i == 0) null else cats[i - 1] }, Modifier.padding(bottom = 8.dp),
+                        counts = listOf(all.size) + cats.map { c -> all.count { it.category == c } })
+                }
                 LoadableContent(snap, empty = { it.items.isEmpty() }, emptyText = "Nothing downloading") { data ->
                     val label = filters.getOrElse(filter) { "All" }
-                    val shown = data.items.filter { matches(label, it) }.let { l ->
+                    val shown = data.items.filter { matches(label, it) && (catFilter == null || it.category == catFilter) }.let { l ->
                         when (sort) {
                             1 -> l.sortedBy { it.name.lowercase() }
                             2 -> l.sortedBy { it.progress }
@@ -220,6 +257,7 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
                             else -> if (client.isUsenet) l else l.sortedByDescending { it.addedOn }
                         }
                     }
+                    androidx.compose.runtime.LaunchedEffect(shown) { visibleIds = shown.map { it.id } }
                     LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(shown, key = { it.id }) { item ->
                             val sel = item.id in selection
@@ -230,9 +268,9 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
                                 onSwipeLeft = { deleteIds = listOf(item.id) },
                             ) {
                             DownloadRow(
-                                item, sel, client.isUsenet,
+                                item, sel, client.isUsenet, selecting,
                                 onClick = {
-                                    if (selection.isNotEmpty()) {
+                                    if (selecting) {
                                         selection = if (sel) selection - item.id else selection + item.id
                                     } else {
                                         action = item
@@ -265,6 +303,7 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
                         TextButton(onClick = { action = null; run("Force started", refresh) { c.forceStart(listOf(item.id)) } }) { Text("Force start") }
                         TextButton(onClick = { action = null; run("Recheck started", refresh) { c.recheck(listOf(item.id)) } }) { Text("Force recheck") }
                     }
+                    if (client.supportsCategories) TextButton(onClick = { action = null; catFor = listOf(item.id) }) { Text(if (item.category.isEmpty()) "Set category" else "Change category") }
                     TextButton(onClick = { action = null; selection = setOf(item.id) }) { Text("Select (multi-select mode)") }
                 }
             },
@@ -289,12 +328,18 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
             text = { Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(withData, { withData = it }); Text("Also delete downloaded files") } },
             confirmButton = {
                 TextButton(onClick = {
-                    deleteIds = null; selection = emptySet()
+                    deleteIds = null; selection = emptySet(); selectMode = false
                     run("Deleted", refresh) { client.delete(ids, withData) }
                 }) { Text("Delete", color = Bad) }
             },
             dismissButton = { TextButton(onClick = { deleteIds = null }) { Text("Cancel") } },
         )
+    }
+
+    catFor?.let { ids ->
+        CategoryDialog(client, ids, s?.items ?: emptyList(), onDismiss = { catFor = null }) {
+            catFor = null; selection = emptySet(); selectMode = false; snap.load(true)
+        }
     }
 
     if (addOpen) {
@@ -317,7 +362,7 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
 }
 
 @Composable
-private fun DownloadRow(item: DlItem, selected: Boolean, usenet: Boolean, onClick: () -> Unit, onLongClick: () -> Unit, onToggle: () -> Unit) {
+private fun DownloadRow(item: DlItem, selected: Boolean, usenet: Boolean, selecting: Boolean, onClick: () -> Unit, onLongClick: () -> Unit, onToggle: () -> Unit) {
     val color = when {
         item.error -> Bad
         item.paused -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -360,6 +405,7 @@ private fun DownloadRow(item: DlItem, selected: Boolean, usenet: Boolean, onClic
                 }
             }
             if (selected) Icon(Icons.Filled.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(12.dp))
+            else if (selecting) Icon(Icons.Filled.RadioButtonUnchecked, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(12.dp))
             else IconButton(onClick = onToggle) { Icon(if (item.paused) Icons.Filled.PlayArrow else Icons.Filled.Pause, if (item.paused) "Resume" else "Pause") }
         }
     }
@@ -440,4 +486,57 @@ private fun SwipeRow(paused: Boolean, modifier: Modifier, onSwipeRight: () -> Un
             }
         },
     ) { content() }
+}
+
+/** Pick, create or clear a category (qBittorrent) / label (ruTorrent) for one or many torrents. */
+@Composable
+private fun CategoryDialog(client: com.arrmada360.app.api.DownloadClient, ids: List<String>, items: List<DlItem>, onDismiss: () -> Unit, onDone: () -> Unit) {
+    val run = rememberRunner()
+    val cats = rememberLoadable(client.cfg, "cats") { client.categories() }
+    var newName by remember { mutableStateOf("") }
+    var newPath by remember { mutableStateOf("") }
+    val manageOnly = ids.isEmpty()
+    val current = items.filter { it.id in ids }.map { it.category }.distinct()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (manageOnly) "Categories" else "Category for ${ids.size} torrent${if (ids.size == 1) "" else "s"}") },
+        text = {
+            Column(Modifier.heightIn(max = 460.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                val list = cats.data
+                if (list == null) Text("Loading…") else {
+                    if (list.isEmpty()) Text("No categories yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    list.forEachIndexed { i, c ->
+                        val color = Rainbow[i % Rainbow.size]
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                .let { m -> if (manageOnly) m else m.clickable { run("Category set to $c", onDone) { client.setCategory(ids, c) } } }
+                                .padding(vertical = 10.dp, horizontal = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            StatusDot(color, 10.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Text(c, fontWeight = if (c in current) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f))
+                            Text("${items.count { it.category == c }}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (c in current && current.size == 1) { Spacer(Modifier.width(6.dp)); Icon(Icons.Filled.CheckCircle, null, tint = color) }
+                        }
+                    }
+                    if (!manageOnly && current.any { it.isNotEmpty() }) TextButton(onClick = { run("Category removed", onDone) { client.setCategory(ids, "") } }) {
+                        Text("Remove category", color = Bad)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Text(if (client is QbitClient) "New category" else "New label", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                OutlinedTextField(newName, { newName = it }, singleLine = true, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
+                if (client is QbitClient) OutlinedTextField(newPath, { newPath = it }, singleLine = true, label = { Text("Save path (optional)") }, modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = newName.isNotBlank() && !(manageOnly && client !is QbitClient), onClick = {
+                val n = newName.trim(); val pth = newPath.trim()
+                if (manageOnly) run("Category $n created", onDone) { client.createCategory(n, pth) }
+                else run("Category set to $n", onDone) { client.createCategory(n, pth); client.setCategory(ids, n) }
+            }) { Text(if (manageOnly) "Create" else "Create & apply") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
 }
