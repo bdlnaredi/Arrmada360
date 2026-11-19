@@ -73,6 +73,9 @@ import com.arrmada360.app.ui.Loadable
 import com.arrmada360.app.ui.MenuRow
 import com.arrmada360.app.ui.Navigator
 import com.arrmada360.app.ui.Pill
+import com.arrmada360.app.ui.PosterTag
+import com.arrmada360.app.ui.MediaStatus
+import com.arrmada360.app.ui.MediaStatusIcon
 import com.arrmada360.app.ui.Pink
 import com.arrmada360.app.ui.Poster
 import com.arrmada360.app.ui.Rainbow
@@ -129,6 +132,7 @@ fun DiscoverTab(isMovie: Boolean, arr: ServiceConfig?, nav: Navigator) {
 
     LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
         if (!Discover.hasAnySource()) item { SourcesHint(nav) }
+        item(key = "legend") { com.arrmada360.app.ui.StatusLegend(Modifier.padding(start = 16.dp, top = 8.dp)) }
         item(key = "hero") { HeroRow(trending, if (isMovie) "Trending movies" else "Trending shows", lib.data) { openItem = it } }
         if (arr != null) item(key = "recent") {
             EntryRow("Recently downloaded", Icons.Filled.DownloadDone, Good, recent, arr) { e -> nav.push(Route.ArrDetail(arr.id, e.parentId)) }
@@ -203,9 +207,10 @@ private fun HeroRow(l: Loadable<DiscoverRow<DiscoverItem>>, title: String, lib: 
                     Text(i.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (i.year.isNotEmpty()) Text(i.year, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f))
-                        if (i.rating > 0) Pill("★ %.1f".format(i.rating), Warn)
-                        if (i.extra.isNotEmpty()) Pill(i.extra, MaterialTheme.colorScheme.primary)
-                        if (lib?.find(i) != null) Pill("✓ In library", Good, solid = true)
+                        if (i.rating > 0) PosterTag("★ %.1f".format(i.rating), Warn)
+                        if (i.extra.isNotEmpty()) PosterTag(i.extra, MaterialTheme.colorScheme.primary)
+                        val st = if (lib?.find(i) != null) MediaStatus.IN_LIBRARY else MediaStatus.fromSeerr(i.seerrStatus)
+                        if (st != null) MediaStatusIcon(st, 24.dp)
                     }
                 }
             }
@@ -245,9 +250,9 @@ private fun PosterCard(i: DiscoverItem, color: Color, inLib: Boolean, showDate: 
     Column(Modifier.width(120.dp).clickable(onClick = onClick)) {
         Box(Modifier.clip(RoundedCornerShape(12.dp)).border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(12.dp))) {
             Poster(i.poster, Modifier.fillMaxWidth(), corner = 12.dp, fallback = i.title)
-            if (i.rating > 0) Box(Modifier.align(Alignment.TopStart).padding(5.dp)) { Pill("★ %.1f".format(i.rating), Warn, solid = true) }
-            if (inLib) Box(Modifier.align(Alignment.TopEnd).padding(5.dp)) { Pill("✓", Good, solid = true) }
-            else if (i.seerrStatus >= 2) Box(Modifier.align(Alignment.TopEnd).padding(5.dp)) { Pill(if (i.seerrStatus >= 5) "Available" else "Requested", Accent2, solid = true) }
+            if (i.rating > 0) Box(Modifier.align(Alignment.TopStart).padding(5.dp)) { PosterTag("★ %.1f".format(i.rating), Warn) }
+            val st = if (inLib) MediaStatus.IN_LIBRARY else MediaStatus.fromSeerr(i.seerrStatus)
+            if (st != null) Box(Modifier.align(Alignment.TopEnd).padding(5.dp)) { MediaStatusIcon(st) }
             if (showDate && i.date.isNotEmpty()) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)))).padding(6.dp)) {
                 Text(relativeDay(parseDate(i.date)), style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
             }
@@ -351,7 +356,9 @@ private fun DiscoverSheet(i: DiscoverItem, isMovie: Boolean, lib: LibIndex?, nav
                         }
                     }
                     if (seerr != null && i.tmdbId > 0) {
-                        if (i.seerrStatus >= 2) Pill(if (i.seerrStatus >= 5) "Available in Seerr" else "Already requested in Seerr", Accent2)
+                        MediaStatus.fromSeerr(i.seerrStatus)?.let { st ->
+                            Row(verticalAlignment = Alignment.CenterVertically) { MediaStatusIcon(st, 22.dp); Spacer(Modifier.width(8.dp)); Text(st.label + " in Seerr", color = Color.White, fontWeight = FontWeight.Bold) }
+                        }
                         else OutlinedButton(onClick = {
                             onDismiss()
                             run("Requested ${i.title}") {

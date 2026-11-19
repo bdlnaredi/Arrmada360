@@ -8,6 +8,13 @@ Builds #2, #5 and #10 failed to compile in CI and were fixed straight away in bu
 
 ---
 
+## [1.0.15] – 2026-11-19
+
+### Changed
+- **Poster tags are readable on any artwork**: white bold text on a dark glass background, with a subtle shadow.
+- **Status shown as icons instead of words** on posters: ✓ available or in your library (green), half circle for partially available (blue), download arrow for processing (amber), clock for requested (purple), and a block sign for declined (red). A small key sits above the Movies, TV and Seerr Discover grids.
+- All coloured tags across the app now use white text on a stronger coloured background.
+
 ## [1.0.14] – 2026-11-19
 
 ### Added

@@ -148,7 +148,13 @@ private fun RequestsTab(api: SeerrApi) {
                                 Text("by ${r.requestedBy} · ${fmtDate(r.created)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(6.dp))
                                 val (label, color) = requestStatus(r)
-                                Pill(label, color)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    val st = when { r.status == 1 -> com.arrmada360.app.ui.MediaStatus.REQUESTED; r.status == 3 || r.status == 4 -> com.arrmada360.app.ui.MediaStatus.DECLINED
+                                        else -> com.arrmada360.app.ui.MediaStatus.fromSeerr(r.mediaStatus) ?: com.arrmada360.app.ui.MediaStatus.PROCESSING }
+                                    com.arrmada360.app.ui.MediaStatusIcon(st, 22.dp)
+                                    Spacer(Modifier.width(6.dp))
+                                    Pill(label, color)
+                                }
                             }
                             Column {
                                 if (r.status == 1) {
@@ -187,6 +193,7 @@ private fun DiscoverTab(api: SeerrApi) {
         )
         if (submitted.isBlank()) ChipRow(DISCOVER.map { it.first }, kind, { kind = it }, Modifier.padding(vertical = 8.dp))
         else Spacer(Modifier.height(8.dp))
+        com.arrmada360.app.ui.StatusLegend(Modifier.padding(start = 16.dp, bottom = 8.dp))
         LoadableContent(l, empty = { it.isEmpty() }, emptyText = "Nothing found") { list ->
             LazyVerticalGrid(GridCells.Fixed(3), contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 32.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -194,8 +201,8 @@ private fun DiscoverTab(api: SeerrApi) {
                     Column(Modifier.clickable { pick = m }) {
                         Box {
                             Poster(m.poster, Modifier.fillMaxWidth(), fallback = m.title)
-                            if (m.status >= 2) Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
-                                Pill(when (m.status) { 5 -> "Available"; 4 -> "Partial"; 3 -> "Processing"; else -> "Requested" }, if (m.status >= 4) Good else Warn)
+                            com.arrmada360.app.ui.MediaStatus.fromSeerr(m.status)?.let { st ->
+                                Box(Modifier.align(Alignment.TopEnd).padding(5.dp)) { com.arrmada360.app.ui.MediaStatusIcon(st) }
                             }
                         }
                         Text(m.title, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)

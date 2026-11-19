@@ -44,6 +44,11 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Downloading
+import androidx.compose.material.icons.filled.Contrast
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -412,9 +417,63 @@ fun PulseDot(color: Color, pulsing: Boolean = true, size: Dp = 10.dp) {
 fun Pill(text: String, color: Color = MaterialTheme.colorScheme.primary, solid: Boolean = false) {
     Box(
         Modifier.clip(RoundedCornerShape(50))
-            .background(if (solid) SolidColor(color) else Brush.horizontalGradient(listOf(color.copy(alpha = 0.26f), color.copy(alpha = 0.12f))))
+            .background(
+                if (solid) SolidColor(color.copy(alpha = 0.92f).compositeOver(Color.Black))
+                else Brush.horizontalGradient(listOf(color.copy(alpha = 0.55f), color.copy(alpha = 0.38f))),
+            )
             .padding(horizontal = 9.dp, vertical = 3.dp),
-    ) { Text(text, color = if (solid) Color(0xFF0B0D10) else color, style = MaterialTheme.typography.labelSmall, maxLines = 1, fontWeight = FontWeight.SemiBold) }
+    ) { Text(text, color = Color.White, style = MaterialTheme.typography.labelSmall.copy(shadow = TextShadow), maxLines = 1, fontWeight = FontWeight.Bold) }
+}
+
+private val TextShadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = 0.6f), Offset(0f, 1f), 3f)
+
+/** A tag drawn on top of poster art: white bold text on a dark glass background, readable on any image. */
+@Composable
+fun PosterTag(text: String, accent: Color = Color.White) {
+    Row(
+        Modifier.clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.62f))
+            .border(1.dp, accent.copy(alpha = 0.7f), RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) { Text(text, color = Color.White, style = MaterialTheme.typography.labelSmall.copy(shadow = TextShadow), fontWeight = FontWeight.Bold, maxLines = 1) }
+}
+
+/** Media status shown as an icon (no text) on posters. */
+enum class MediaStatus(val icon: androidx.compose.ui.graphics.vector.ImageVector, val color: Color, val label: String) {
+    AVAILABLE(androidx.compose.material.icons.Icons.Filled.Check, Color(0xFF22C55E), "Available"),
+    IN_LIBRARY(androidx.compose.material.icons.Icons.Filled.Check, Color(0xFF22C55E), "In your library"),
+    PARTIAL(androidx.compose.material.icons.Icons.Filled.Contrast, Color(0xFF0EA5E9), "Partially available"),
+    PROCESSING(androidx.compose.material.icons.Icons.Filled.Downloading, Color(0xFFF59E0B), "Processing / downloading"),
+    REQUESTED(androidx.compose.material.icons.Icons.Filled.Schedule, Color(0xFFA855F7), "Requested – waiting"),
+    DECLINED(androidx.compose.material.icons.Icons.Filled.Block, Color(0xFFEF4444), "Declined");
+
+    companion object {
+        /** Overseerr/Jellyseerr media status: 2 pending, 3 processing, 4 partial, 5 available. */
+        fun fromSeerr(status: Int): MediaStatus? = when (status) {
+            5 -> AVAILABLE; 4 -> PARTIAL; 3 -> PROCESSING; 2 -> REQUESTED; else -> null
+        }
+    }
+}
+
+@Composable
+fun MediaStatusIcon(status: MediaStatus, size: Dp = 26.dp) {
+    Box(
+        Modifier.size(size).clip(CircleShape).background(status.color).border(2.dp, Color.White, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) { Icon(status.icon, status.label, tint = Color.White, modifier = Modifier.size(size * 0.62f)) }
+}
+
+/** Small key explaining the status icons. */
+@Composable
+fun StatusLegend(modifier: Modifier = Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        listOf(MediaStatus.AVAILABLE to "Available", MediaStatus.PARTIAL to "Partial", MediaStatus.PROCESSING to "Processing", MediaStatus.REQUESTED to "Requested").forEach { (s, l) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MediaStatusIcon(s, 18.dp)
+                Spacer(Modifier.width(4.dp))
+                Text(l, style = MaterialTheme.typography.labelSmall, color = Color.White)
+            }
+        }
+    }
 }
 
 @Composable
