@@ -1,6 +1,17 @@
 package com.arrmada360.app.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
+import com.arrmada360.app.ui.Accent
+import com.arrmada360.app.ui.Accent2
+import com.arrmada360.app.ui.AppBackground
+import com.arrmada360.app.ui.GradientButton
+import com.arrmada360.app.ui.Pink
+import com.arrmada360.app.ui.Warn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -119,29 +130,51 @@ fun Onboarding() {
 
 @Composable
 private fun WelcomeScreen(onStart: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().navigationBarsPadding().padding(28.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Box(Modifier.size(140.dp).clip(RoundedCornerShape(36.dp)).background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
-            Icon(painterResource(R.drawable.ic_launcher_foreground), null, tint = Color.Unspecified, modifier = Modifier.size(150.dp))
-        }
-        Spacer(Modifier.height(28.dp))
-        Text("Arrmada360", fontSize = 34.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Your whole media server in one app.\nEvery feature unlocked — free, forever.",
-            textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(28.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(ServiceType.SONARR, ServiceType.RADARR, ServiceType.PROWLARR, ServiceType.QBITTORRENT, ServiceType.SABNZBD, ServiceType.UNRAID)
-                .forEach { ServiceBadge(it, 38.dp) }
-        }
-        Spacer(Modifier.height(48.dp))
-        Button(onClick = onStart, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) {
-            Text("Get started", fontSize = 16.sp)
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "welcome")
+    val bob by t.animateFloat(
+        0f, 1f,
+        androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(2200), androidx.compose.animation.core.RepeatMode.Reverse),
+        label = "bob",
+    )
+    val spin by t.animateFloat(
+        0f, 360f,
+        androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(14000, easing = androidx.compose.animation.core.LinearEasing)),
+        label = "spin",
+    )
+    AppBackground {
+        Column(
+            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.size(170.dp).graphicsLayer { rotationZ = spin }.clip(CircleShape)
+                        .background(Brush.sweepGradient(listOf(Accent, Accent2, Pink, Warn, Accent))),
+                )
+                Box(Modifier.size(158.dp).clip(CircleShape).background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+                    Icon(painterResource(R.drawable.ic_launcher_foreground), null, tint = Color.Unspecified, modifier = Modifier.size(170.dp))
+                }
+            }
+            Spacer(Modifier.height(28.dp))
+            Text("Arrmada360", fontSize = 36.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Your whole media server in one app.\nEvery feature unlocked — free, forever.",
+                textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(30.dp))
+            val rows = ServiceType.entries.chunked(5)
+            rows.forEachIndexed { r, row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(vertical = 5.dp)) {
+                    row.forEachIndexed { i, type ->
+                        val phase = ((i + r) % 2) * 2 - 1
+                        Box(Modifier.graphicsLayer { translationY = (bob - 0.5f) * 14f * phase }) { ServiceBadge(type, 46.dp) }
+                    }
+                }
+            }
+            Spacer(Modifier.height(40.dp))
+            GradientButton("Get started", Modifier.fillMaxWidth().height(56.dp), onClick = onStart)
         }
     }
 }
@@ -178,8 +211,8 @@ fun ServicePickerScreen(
                             Box(
                                 Modifier
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(if (on) t.tint.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surface)
-                                    .border(BorderStroke(1.5.dp, if (on) t.tint else Color.Transparent), RoundedCornerShape(14.dp))
+                                    .background(if (on) Brush.linearGradient(listOf(t.tint.copy(alpha = 0.34f), t.tint2.copy(alpha = 0.14f))) else Brush.linearGradient(listOf(t.tint.copy(alpha = 0.08f).compositeOver(MaterialTheme.colorScheme.surface), MaterialTheme.colorScheme.surface)))
+                                    .border(BorderStroke(if (on) 2.dp else 1.dp, if (on) t.tint else t.tint.copy(alpha = 0.18f)), RoundedCornerShape(14.dp))
                                     .clickable {
                                         if (multi) selected = if (on) selected - t else selected + t
                                         else onDone(listOf(t))
@@ -187,7 +220,7 @@ fun ServicePickerScreen(
                                     .padding(12.dp),
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    ServiceBadge(t, 40.dp)
+                                    ServiceBadge(t, 46.dp)
                                     Spacer(Modifier.width(10.dp))
                                     Column(Modifier.weight(1f)) {
                                         Text(t.label, style = MaterialTheme.typography.titleSmall, maxLines = 1)
@@ -201,11 +234,10 @@ fun ServicePickerScreen(
                 }
             }
             if (multi) {
-                Button(
-                    onClick = { onDone(ServiceType.entries.filter { it in selected }) },
-                    modifier = Modifier.fillMaxWidth().padding(16.dp).navigationBarsPadding().height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                ) { Text(if (selected.isEmpty()) "Skip for now" else "Continue (${selected.size})") }
+                GradientButton(
+                    if (selected.isEmpty()) "Skip for now" else "Continue with ${selected.size} app${if (selected.size == 1) "" else "s"}",
+                    Modifier.fillMaxWidth().padding(16.dp).navigationBarsPadding().height(56.dp),
+                ) { onDone(ServiceType.entries.filter { it in selected }) }
             }
         }
     }
@@ -244,13 +276,22 @@ fun ServiceEditorScreen(
     ServiceTheme(type, ConfigStore.amoled) {
         AppScaffold(
             title = if (existing != null) "Edit ${existing.name}" else "Set up ${type.label}",
-            subtitle = progress, isRoot = false, onBack = onBack, badge = type,
+            subtitle = progress, isRoot = false, onBack = onBack, badge = type, badgeName = name,
             actions = { if (skipLabel != null) TextButton(onClick = onSkip) { Text(skipLabel) } },
         ) { pad ->
             Column(
                 Modifier.fillMaxSize().padding(pad).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                    .background(Brush.linearGradient(listOf(type.tint.copy(alpha = 0.30f), type.tint2.copy(alpha = 0.10f)))).padding(16.dp)) {
+                    ServiceBadge(type, 64.dp, name)
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text(type.label, style = MaterialTheme.typography.titleLarge)
+                        Text("Default port ${type.defaultPort} · ${type.blurb}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
                 OutlinedTextField(name, { name = it }, label = { Text("Display name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(
                     url, { url = it }, label = { Text("Address") },
@@ -284,7 +325,7 @@ fun ServiceEditorScreen(
                         onClick = {
                             testing = true; result = null
                             scope.launch {
-                                result = try { true to ServiceTester.test(build()) } catch (e: Exception) { false to (e.message ?: e.toString()) }
+                                result = try { true to ServiceTester.test(build()) } catch (e: Exception) { false to com.arrmada360.app.net.friendlyError(e) }
                                 testing = false
                             }
                         },
@@ -292,10 +333,11 @@ fun ServiceEditorScreen(
                     ) {
                         if (testing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("Test")
                     }
-                    Button(
-                        onClick = { val c = build(); ConfigStore.upsert(c); onSaved(c) },
-                        enabled = url.isNotBlank(), modifier = Modifier.weight(1f).height(48.dp),
-                    ) { Text("Save") }
+                    GradientButton("Save", Modifier.weight(1f).height(48.dp), enabled = url.isNotBlank()) {
+                        val c = build(); ConfigStore.upsert(c)
+                        scope.launch { com.arrmada360.app.api.Connections.check(c) }
+                        onSaved(c)
+                    }
                 }
                 Spacer(Modifier.height(24.dp))
             }

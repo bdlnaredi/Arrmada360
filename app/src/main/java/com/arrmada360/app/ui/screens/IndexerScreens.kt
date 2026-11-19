@@ -89,7 +89,7 @@ fun IndexerScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
     val jackett = remember(cfg) { if (cfg.type == ServiceType.JACKETT) JackettApi(cfg) else null }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
     AppScaffold(
-        title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type,
+        title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
         tabs = if (prowlarr != null) listOf("Search", "Indexers") else emptyList(), selectedTab = tab, onTab = { tab = it },
     ) { pad ->
         Box(Modifier.padding(pad)) {

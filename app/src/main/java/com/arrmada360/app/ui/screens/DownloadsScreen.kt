@@ -1,6 +1,20 @@
 package com.arrmada360.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.arrmada360.app.api.SpeedHistory
+import com.arrmada360.app.ui.Panel
+import com.arrmada360.app.ui.Sparkline
+import com.arrmada360.app.ui.animatedLong
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -81,7 +95,7 @@ private val DL_SORTS = listOf("Added (newest)", "Name", "Progress", "Size", "Dow
 @Composable
 fun DownloadsScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
     val client = remember(cfg) { DownloadClients.of(cfg) } ?: return EmptyBox("Unsupported client")
-    val snap = rememberLoadable(cfg, autoRefreshMs = 2500) { client.snapshot() }
+    val snap = rememberLoadable(cfg, autoRefreshMs = 2500) { DownloadClients.snapshot(client) }
     val run = rememberRunner()
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
     var filter by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
@@ -102,7 +116,7 @@ fun DownloadsScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
         title = if (selection.isNotEmpty()) "${selection.size} selected" else cfg.name,
         subtitle = if (selection.isEmpty()) subtitle else null,
         isRoot = isRoot && selection.isEmpty(), onBack = { if (selection.isNotEmpty()) selection = emptySet() else back() },
-        badge = if (selection.isEmpty()) cfg.type else null,
+        badge = if (selection.isEmpty()) cfg.type else null, badgeName = cfg.name,
         tabs = if (client.hasHistory) listOf("Queue", "History") else emptyList(), selectedTab = tab, onTab = { tab = it },
         actions = {
             if (selection.isNotEmpty()) {
@@ -158,21 +172,22 @@ fun DownloadsScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
                 }
             } else {
                 val filters = if (client.isUsenet) listOf("All", "Downloading", "Paused", "Queued") else listOf("All", "Downloading", "Seeding", "Completed", "Paused", "Active", "Errored")
-                ChipRow(filters, filter, { filter = it }, Modifier.padding(vertical = 8.dp))
+                val all = s?.items ?: emptyList()
+                fun matches(label: String, it: DlItem): Boolean = when (label) {
+                    "Downloading" -> !it.done && !it.paused && (it.state.contains("Download", true) || it.state.contains("Stalled", true) || it.dlSpeed > 0 || client.isUsenet)
+                    "Seeding" -> it.done && !it.paused
+                    "Completed" -> it.done
+                    "Paused" -> it.paused
+                    "Queued" -> it.state.contains("Queue", true)
+                    "Active" -> it.dlSpeed > 0 || it.upSpeed > 0
+                    "Errored" -> it.error
+                    else -> true
+                }
+                SpeedHeader(cfg, client.isUsenet, s)
+                ChipRow(filters, filter, { filter = it }, Modifier.padding(vertical = 8.dp), counts = filters.map { f -> all.count { matches(f, it) } })
                 LoadableContent(snap, empty = { it.items.isEmpty() }, emptyText = "Nothing downloading") { data ->
                     val label = filters.getOrElse(filter) { "All" }
-                    val shown = data.items.filter {
-                        when (label) {
-                            "Downloading" -> !it.done && !it.paused && (it.state.contains("Download", true) || it.state.contains("Stalled", true) || it.dlSpeed > 0 || client.isUsenet)
-                            "Seeding" -> it.done && !it.paused
-                            "Completed" -> it.done
-                            "Paused" -> it.paused
-                            "Queued" -> it.state.contains("Queue", true)
-                            "Active" -> it.dlSpeed > 0 || it.upSpeed > 0
-                            "Errored" -> it.error
-                            else -> true
-                        }
-                    }.let { l ->
+                    val shown = data.items.filter { matches(label, it) }.let { l ->
                         when (sort) {
                             1 -> l.sortedBy { it.name.lowercase() }
                             2 -> l.sortedBy { it.progress }
@@ -186,6 +201,12 @@ fun DownloadsScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
                     LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(shown, key = { it.id }) { item ->
                             val sel = item.id in selection
+                            SwipeRow(
+                                paused = item.paused,
+                                modifier = Modifier.animateItem(),
+                                onSwipeRight = { if (item.paused) run("Resumed", refresh) { client.resume(listOf(item.id)) } else run("Paused", refresh) { client.pause(listOf(item.id)) } },
+                                onSwipeLeft = { deleteIds = listOf(item.id) },
+                            ) {
                             DownloadRow(
                                 item, sel, client.isUsenet,
                                 onClick = {
@@ -198,6 +219,7 @@ fun DownloadsScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
                                 onLongClick = { selection = if (sel) selection - item.id else selection + item.id },
                                 onToggle = { if (item.paused) run(null, refresh) { client.resume(listOf(item.id)) } else run(null, refresh) { client.pause(listOf(item.id)) } },
                             )
+                            }
                         }
                     }
                 }
@@ -283,18 +305,26 @@ private fun DownloadRow(item: DlItem, selected: Boolean, usenet: Boolean, onClic
     }
     Box(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
-            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
+            .background(
+                if (selected) SolidColor(MaterialTheme.colorScheme.primaryContainer)
+                else Brush.linearGradient(listOf(color.copy(alpha = 0.16f).compositeOver(MaterialTheme.colorScheme.surface), MaterialTheme.colorScheme.surface)),
+            )
+            .border(1.dp, color.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
         Row(Modifier.padding(start = 12.dp, top = 10.dp, bottom = 10.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(item.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(item.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(6.dp))
+                    Text("${(item.progress * 100).toInt()}%", style = MaterialTheme.typography.titleSmall, color = color)
+                }
                 Spacer(Modifier.height(6.dp))
-                ProgressBar(item.progress, color = color)
+                ProgressBar(item.progress, color = color, height = 6.dp)
                 Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(item.state, style = MaterialTheme.typography.labelSmall, color = color)
-                    Text("  ·  ${(item.progress * 100).toInt()}%  ·  ${humanBytes(item.size)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Pill(item.state, color)
+                    Text("  ${humanBytes(item.size)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.weight(1f))
                     if (!item.done && !item.paused && item.eta != 0L) Text(humanEta(item.eta), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -311,4 +341,77 @@ private fun DownloadRow(item: DlItem, selected: Boolean, usenet: Boolean, onClic
             else IconButton(onClick = onToggle) { Icon(if (item.paused) Icons.Filled.PlayArrow else Icons.Filled.Pause, if (item.paused) "Resume" else "Pause") }
         }
     }
+}
+
+@Composable
+private fun SpeedHeader(cfg: ServiceConfig, usenet: Boolean, s: com.arrmada360.app.api.DlSnapshot?) {
+    val down = SpeedHistory.down[cfg.id] ?: emptyList()
+    val up = SpeedHistory.up[cfg.id] ?: emptyList()
+    val dl = animatedLong(s?.dlSpeed ?: 0)
+    val ul = animatedLong(s?.upSpeed ?: 0)
+    Panel(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+        Box(Modifier.fillMaxWidth().height(112.dp)) {
+            if (!usenet && up.size > 1) Sparkline(up, Good, Modifier.matchParentSize().padding(top = 40.dp), fill = true)
+            if (down.size > 1) Sparkline(down, MaterialTheme.colorScheme.primary, Modifier.matchParentSize().padding(top = 30.dp), fill = true)
+            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.ArrowDownward, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                        Text(humanSpeed(dl), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Text("Download", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (!usenet) Column(horizontalAlignment = Alignment.End) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.ArrowUpward, null, Modifier.size(14.dp), tint = Good)
+                        Text(humanSpeed(ul), style = MaterialTheme.typography.titleMedium, color = Good)
+                    }
+                    Text("Upload", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (s != null && s.freeSpace > 0) {
+                    Spacer(Modifier.width(14.dp))
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(humanBytes(s.freeSpace), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
+                        Text("Free space", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Swipe right to pause / resume, swipe left to delete. */
+@Composable
+private fun SwipeRow(paused: Boolean, modifier: Modifier, onSwipeRight: () -> Unit, onSwipeLeft: () -> Unit, content: @Composable () -> Unit) {
+    val haptic = LocalHapticFeedback.current
+    val state = rememberSwipeToDismissBoxState(
+        confirmValueChange = { v ->
+            when (v) {
+                SwipeToDismissBoxValue.StartToEnd -> { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onSwipeRight() }
+                SwipeToDismissBoxValue.EndToStart -> { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onSwipeLeft() }
+                else -> {}
+            }
+            false
+        },
+    )
+    SwipeToDismissBox(
+        state = state,
+        modifier = modifier,
+        backgroundContent = {
+            val dir = state.dismissDirection
+            val color = when (dir) { SwipeToDismissBoxValue.StartToEnd -> if (paused) Good else Warn; SwipeToDismissBoxValue.EndToStart -> Bad; else -> Color.Transparent }
+            Box(
+                Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(Brush.horizontalGradient(
+                    if (dir == SwipeToDismissBoxValue.EndToStart) listOf(Color.Transparent, color.copy(alpha = 0.6f)) else listOf(color.copy(alpha = 0.6f), Color.Transparent),
+                )).padding(horizontal = 20.dp),
+                contentAlignment = if (dir == SwipeToDismissBoxValue.EndToStart) Alignment.CenterEnd else Alignment.CenterStart,
+            ) {
+                when (dir) {
+                    SwipeToDismissBoxValue.StartToEnd -> Icon(if (paused) Icons.Filled.PlayArrow else Icons.Filled.Pause, null, tint = Color.White)
+                    SwipeToDismissBoxValue.EndToStart -> Icon(Icons.Filled.Delete, null, tint = Color.White)
+                    else -> {}
+                }
+            }
+        },
+    ) { content() }
 }

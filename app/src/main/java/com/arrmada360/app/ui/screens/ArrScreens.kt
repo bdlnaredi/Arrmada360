@@ -1,6 +1,10 @@
 package com.arrmada360.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import com.arrmada360.app.ui.StatTile
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -124,7 +128,7 @@ fun ArrScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () -> U
     val run = rememberRunner()
 
     AppScaffold(
-        title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type,
+        title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
         tabs = tabs, selectedTab = tab, onTab = { tab = it },
         actions = {
             IconButton(onClick = { nav.push(Route.ArrAdd(cfg.id)) }) { Icon(Icons.Filled.Search, "Add new") }
@@ -148,7 +152,7 @@ fun ArrScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () -> U
             }
         },
         fab = {
-            if (tab == 0) FloatingActionButton(onClick = { nav.push(Route.ArrAdd(cfg.id)) }, containerColor = MaterialTheme.colorScheme.primary) {
+            if (tab == 0) FloatingActionButton(onClick = { nav.push(Route.ArrAdd(cfg.id)) }, containerColor = MaterialTheme.colorScheme.primary, shape = androidx.compose.foundation.shape.CircleShape) {
                 Icon(Icons.Filled.Add, "Add")
             }
         },
@@ -216,7 +220,14 @@ private fun LibraryTab(api: ArrApi, nav: Navigator) {
                 }
             }
         }
-        ChipRow(filters, filter, { filter = it }, Modifier.padding(vertical = 6.dp))
+        val all = l.data ?: emptyList()
+        val counts = listOf(all.size, all.count { it.monitored }, all.count { it.monitored && !it.complete }, all.count { it.complete }, all.count { !it.monitored })
+        if (all.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatTile(api.itemWord.let { if (it == "Series") "Series" else it + "s" }, all.size.toString(), MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+            StatTile("Missing", counts[2].toString(), Bad, Modifier.weight(1f))
+            StatTile("On disk", humanBytes(all.sumOf { it.sizeOnDisk }), MaterialTheme.colorScheme.secondary, Modifier.weight(1f))
+        }
+        ChipRow(filters, filter, { filter = it }, Modifier.padding(vertical = 6.dp), counts = if (all.isEmpty()) null else counts)
         LoadableContent(l, empty = { it.isEmpty() }, emptyText = "Your library is empty.\nTap + to add something.") { items ->
             val shown = remember(items, query, sort, filter) {
                 items.asSequence()
@@ -250,20 +261,37 @@ private fun LibraryTab(api: ArrApi, nav: Navigator) {
 
 @Composable
 private fun PosterTile(m: MediaItem, onClick: () -> Unit) {
-    Column(Modifier.clickable(onClick = onClick)) {
-        Box {
-            Poster(m.poster, Modifier.fillMaxWidth(), ratio = if (m.raw.has("artistName")) 1f else 2f / 3f, fallback = m.title)
-            if (!m.monitored) Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.45f)))
-            val color = when { m.complete -> Good; !m.monitored -> Color.Gray; m.raw.optString("status") == "continuing" -> MaterialTheme.colorScheme.primary; else -> Bad }
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(color))
+    val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.94f else 1f, label = "tile")
+    val color = when { m.complete -> Good; !m.monitored -> Color.Gray; m.raw.optString("status") == "continuing" -> MaterialTheme.colorScheme.primary; else -> Bad }
+    Column(
+        Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
+            .clickable(interactionSource = src, indication = androidx.compose.material3.ripple(), onClick = onClick),
+    ) {
+        Box(Modifier.clip(RoundedCornerShape(12.dp)).border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(12.dp))) {
+            Poster(m.poster, Modifier.fillMaxWidth(), ratio = if (m.raw.has("artistName")) 1f else 2f / 3f, corner = 12.dp, fallback = m.title)
+            if (!m.monitored) Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f)))
+            Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.7f)))))
+            Box(Modifier.align(Alignment.TopEnd).padding(5.dp)) {
+                Icon(if (m.monitored) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder, null, tint = if (m.monitored) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+            }
+            Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(6.dp)) {
+                Text(m.progressText, style = MaterialTheme.typography.labelSmall, color = Color.White, maxLines = 1)
+                Spacer(Modifier.height(3.dp))
+                val prog = when {
+                    m.complete -> 1f
+                    m.progressText.contains("/") -> m.progressText.substringBefore(" ").split("/").let { p -> val h = p[0].toFloatOrNull() ?: 0f; val t = p.getOrNull(1)?.toFloatOrNull() ?: 0f; if (t > 0) h / t else 0f }
+                    else -> 0f
+                }
+                ProgressBar(prog, color = color, height = 3.dp)
+            }
         }
-        Spacer(Modifier.height(4.dp))
-        Text(m.title, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
-        Text(listOf(if (m.year > 0) m.year.toString() else "", m.progressText).filter { it.isNotEmpty() }.joinToString(" · "),
-            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        Spacer(Modifier.height(5.dp))
+        Text(m.title, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+        if (m.year > 0) Text(m.year.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }
-
 
 // ------------------------------------------------------------ Calendar & Wanted
 @Composable
@@ -297,15 +325,18 @@ private fun CalendarTab(api: ArrApi, nav: Navigator, wanted: Boolean) {
 
 @Composable
 private fun CalRow(e: CalEntry, onClick: () -> Unit, trailing: @Composable () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Poster(e.poster, Modifier.width(44.dp), corner = 6.dp)
+    Panel(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), tint = if (e.hasFile) Good else MaterialTheme.colorScheme.primary, onClick = onClick) {
+    Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Poster(e.poster, Modifier.width(48.dp), corner = 8.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(e.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(e.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(fmtDate(e.date, withTime = e.date.length > 10), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(3.dp))
+            Pill(fmtDate(e.date, withTime = e.date.length > 10).ifEmpty { "TBA" }, if (e.hasFile) Good else MaterialTheme.colorScheme.primary)
         }
         trailing()
+    }
     }
 }
 
@@ -556,10 +587,15 @@ private fun InfoLine(label: String, value: String) {
 @Composable
 private fun ActionButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
     Column(
-        Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 6.dp),
+        Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+        Box(
+            Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), MaterialTheme.colorScheme.secondary.copy(alpha = 0.20f))))
+                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), androidx.compose.foundation.shape.CircleShape),
+            contentAlignment = Alignment.Center,
+        ) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary) }
         Spacer(Modifier.height(4.dp))
         Text(label, style = MaterialTheme.typography.labelSmall)
     }

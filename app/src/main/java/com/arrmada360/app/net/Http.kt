@@ -97,3 +97,22 @@ fun JSONArray.strings(): List<String> = (0 until length()).map { optString(it) }
 fun jsonArrayOf(vararg v: Any?): JSONArray = JSONArray().apply { v.forEach { put(it) } }
 fun JSONArray.ints(): List<Int> = (0 until length()).map { optInt(it) }
 fun intsJson(ids: List<Int>): JSONArray = JSONArray().apply { ids.forEach { put(it) } }
+
+/** Turns low-level network errors into plain-English hints. */
+fun friendlyError(e: Throwable): String = when (e) {
+    is ApiException -> when (e.code) {
+        401, 403 -> "Wrong API key or login (HTTP ${e.code})"
+        404 -> "Not found (HTTP 404) – check the address, port and URL base (e.g. /sonarr)"
+        407 -> "A proxy is asking for a login (HTTP 407)"
+        502, 503, 504 -> "Server or tunnel error (HTTP ${e.code}) – is the app running?"
+        else -> e.message ?: "HTTP ${e.code}"
+    }
+    is java.net.UnknownHostException -> "Can't find that address – check the IP or domain"
+    is java.net.ConnectException -> "Connection refused – check the port and that the app is running"
+    is java.net.NoRouteToHostException -> "No route to host – is your phone on the same network or VPN?"
+    is java.net.SocketTimeoutException -> "Timed out – is your phone on the same network or Tailscale?"
+    is javax.net.ssl.SSLException -> "HTTPS problem – try http:// or tick 'Allow self-signed HTTPS certificates'"
+    is org.json.JSONException -> "Unexpected reply (not JSON) – is this the right app, port and URL base?"
+    is IllegalArgumentException -> "Invalid address – use something like http://192.168.1.10:8989"
+    else -> e.message ?: e.javaClass.simpleName
+}

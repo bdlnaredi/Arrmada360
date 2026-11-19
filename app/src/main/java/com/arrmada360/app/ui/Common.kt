@@ -4,8 +4,22 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,29 +33,29 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScrollableTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,7 +67,16 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -92,7 +115,7 @@ class Loadable<T>(private val scope: CoroutineScope, private val block: suspend 
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (!silent || data == null) error = e.message ?: e.toString()
+            if (!silent || data == null) error = com.arrmada360.app.net.friendlyError(e)
         }
         loading = false
     }
@@ -124,7 +147,7 @@ class Runner(private val scope: CoroutineScope, private val ctx: Context) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                ctx.toast(e.message ?: "Something went wrong")
+                ctx.toast(com.arrmada360.app.net.friendlyError(e))
             }
         }
     }
@@ -145,6 +168,37 @@ fun Context.copyText(text: String) {
     toast("Copied")
 }
 
+// ------------------------------------------------------------------ backgrounds
+/** Soft coloured glow behind every screen, tinted by the current app's colours. */
+@Composable
+fun AppBackground(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val p = MaterialTheme.colorScheme.primary
+    val s = MaterialTheme.colorScheme.secondary
+    val bg = MaterialTheme.colorScheme.background
+    val t = rememberInfiniteTransition(label = "aurora")
+    val drift by t.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "drift")
+    Box(
+        modifier.fillMaxSize().background(bg).drawBehind {
+            val w = size.width
+            val h = size.height
+            drawCircle(
+                brush = Brush.radialGradient(listOf(p.copy(alpha = 0.30f), Color.Transparent), center = Offset(w * (0.1f + 0.25f * drift), 0f), radius = w * 0.95f),
+                radius = w * 0.95f, center = Offset(w * (0.1f + 0.25f * drift), 0f),
+            )
+            drawCircle(
+                brush = Brush.radialGradient(listOf(s.copy(alpha = 0.22f), Color.Transparent), center = Offset(w * (0.95f - 0.2f * drift), h * 0.22f), radius = w * 0.8f),
+                radius = w * 0.8f, center = Offset(w * (0.95f - 0.2f * drift), h * 0.22f),
+            )
+            drawCircle(
+                brush = Brush.radialGradient(listOf(p.copy(alpha = 0.10f), Color.Transparent), center = Offset(w * 0.3f, h * (0.85f - 0.1f * drift)), radius = w * 0.9f),
+                radius = w * 0.9f, center = Offset(w * 0.3f, h * (0.85f - 0.1f * drift)),
+            )
+        },
+    ) { content() }
+}
+
+fun gradientOf(vararg c: Color): Brush = Brush.linearGradient(c.toList())
+
 // ------------------------------------------------------------------ navigation shell
 val LocalOpenDrawer = staticCompositionLocalOf<() -> Unit> { {} }
 
@@ -155,6 +209,7 @@ fun AppScaffold(
     isRoot: Boolean,
     onBack: () -> Unit,
     badge: ServiceType? = null,
+    badgeName: String? = null,
     actions: @Composable () -> Unit = {},
     fab: @Composable () -> Unit = {},
     tabs: List<String> = emptyList(),
@@ -163,77 +218,99 @@ fun AppScaffold(
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val openDrawer = LocalOpenDrawer.current
-    Scaffold(
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (badge != null) {
-                                ServiceBadge(badge, 28.dp)
-                                Spacer(Modifier.width(10.dp))
+    AppBackground {
+        Scaffold(
+            topBar = {
+                Column {
+                    TopAppBar(
+                        title = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (badge != null) {
+                                    ServiceBadge(badge, 34.dp, badgeName)
+                                    Spacer(Modifier.width(12.dp))
+                                }
+                                Column {
+                                    Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
+                                    if (!subtitle.isNullOrEmpty()) Text(
+                                        subtitle, style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
                             }
-                            Column {
-                                Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                if (!subtitle.isNullOrEmpty()) Text(
-                                    subtitle, style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                    },
-                    navigationIcon = {
-                        if (isRoot) IconButton(onClick = openDrawer) { Icon(Icons.Filled.Menu, "Menu") }
-                        else IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                    },
-                    actions = { actions() },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-                )
-                if (tabs.isNotEmpty()) {
-                    ScrollableTabRow(
-                        selectedTabIndex = selectedTab,
-                        edgePadding = 8.dp,
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.primary,
-                        divider = {},
-                    ) {
-                        tabs.forEachIndexed { i, t ->
-                            Tab(
-                                selected = i == selectedTab, onClick = { onTab(i) },
-                                text = { Text(t, fontWeight = if (i == selectedTab) FontWeight.SemiBold else FontWeight.Normal) },
-                                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                        },
+                        navigationIcon = {
+                            if (isRoot) IconButton(onClick = openDrawer) { Icon(Icons.Filled.Menu, "Menu") }
+                            else IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                        },
+                        actions = { actions() },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    )
+                    if (tabs.isNotEmpty()) PillTabs(tabs, selectedTab, onTab)
                 }
-            }
-        },
-        floatingActionButton = fab,
-        containerColor = MaterialTheme.colorScheme.background,
-        content = content,
-    )
-}
-
-// ------------------------------------------------------------------ small widgets
-@Composable
-fun ServiceBadge(type: ServiceType, size: Dp = 36.dp) {
-    Box(
-        Modifier.size(size).clip(RoundedCornerShape(size / 4)).background(type.tint.copy(alpha = 0.18f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(type.short, color = type.tint, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.38f).sp)
+            },
+            floatingActionButton = fab,
+            containerColor = Color.Transparent,
+            content = content,
+        )
     }
 }
 
 @Composable
-fun Poster(url: String?, modifier: Modifier = Modifier, ratio: Float = 2f / 3f, corner: Dp = 8.dp, fallback: String = "") {
+fun PillTabs(tabs: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val p = MaterialTheme.colorScheme.primary
+    val s = MaterialTheme.colorScheme.secondary
+    LazyRow(
+        modifier = modifier.fillMaxWidth().padding(bottom = 6.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(tabs.size) { i ->
+            val on = i == selected
+            val textColor by animateColorAsState(if (on) Color(0xFF0B0D10) else MaterialTheme.colorScheme.onSurfaceVariant, label = "tab")
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (on) Brush.horizontalGradient(listOf(p, s)) else SolidColor(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)))
+                    .clickable { onSelect(i) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                Text(tabs[i], color = textColor, fontWeight = if (on) FontWeight.Bold else FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------------ logos & widgets
+/** The app's official logo on a tinted tile. Falls back to initials while offline. */
+@Composable
+fun ServiceBadge(type: ServiceType, size: Dp = 36.dp, name: String? = null) {
+    var loaded by remember(type, name) { mutableStateOf(false) }
+    val shape = RoundedCornerShape(size * 0.28f)
     Box(
-        modifier.aspectRatio(ratio).clip(RoundedCornerShape(corner)).background(MaterialTheme.colorScheme.surfaceVariant),
+        Modifier.size(size).clip(shape)
+            .background(Brush.linearGradient(listOf(type.tint.copy(alpha = 0.32f), type.tint2.copy(alpha = 0.14f))))
+            .border(1.dp, type.tint.copy(alpha = 0.45f), shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!loaded) Text(type.short, color = type.tint, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.36f).sp)
+        AsyncImage(
+            model = type.logoUrl(name), contentDescription = type.label, contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize().padding(size * 0.15f),
+            onSuccess = { loaded = true }, onError = { loaded = false },
+        )
+    }
+}
+
+@Composable
+fun Poster(url: String?, modifier: Modifier = Modifier, ratio: Float = 2f / 3f, corner: Dp = 10.dp, fallback: String = "") {
+    Box(
+        modifier.aspectRatio(ratio).clip(RoundedCornerShape(corner))
+            .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f)))),
         contentAlignment = Alignment.Center,
     ) {
         if (fallback.isNotEmpty()) Text(
             fallback.take(24), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(6.dp),
+            color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(6.dp),
         )
         if (url != null) AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
     }
@@ -244,36 +321,128 @@ fun StatusDot(color: Color, size: Dp = 8.dp) {
     Box(Modifier.size(size).clip(CircleShape).background(color))
 }
 
+/** A status dot with a soft pulsing halo, used for "online / live". */
 @Composable
-fun Pill(text: String, color: Color = MaterialTheme.colorScheme.primary) {
+fun PulseDot(color: Color, pulsing: Boolean = true, size: Dp = 10.dp) {
+    val t = rememberInfiniteTransition(label = "pulse")
+    val a by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "a")
+    Box(Modifier.size(size * 2.2f), contentAlignment = Alignment.Center) {
+        if (pulsing) Box(
+            Modifier.size(size * 2.2f).graphicsLayer { scaleX = 0.45f + a * 0.55f; scaleY = 0.45f + a * 0.55f; alpha = 1f - a }
+                .clip(CircleShape).background(color.copy(alpha = 0.6f)),
+        )
+        Box(Modifier.size(size).clip(CircleShape).background(color))
+    }
+}
+
+@Composable
+fun Pill(text: String, color: Color = MaterialTheme.colorScheme.primary, solid: Boolean = false) {
     Box(
-        Modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.16f)).padding(horizontal = 8.dp, vertical = 2.dp),
-    ) { Text(text, color = color, style = MaterialTheme.typography.labelSmall, maxLines = 1) }
+        Modifier.clip(RoundedCornerShape(50))
+            .background(if (solid) SolidColor(color) else Brush.horizontalGradient(listOf(color.copy(alpha = 0.26f), color.copy(alpha = 0.12f))))
+            .padding(horizontal = 9.dp, vertical = 3.dp),
+    ) { Text(text, color = if (solid) Color(0xFF0B0D10) else color, style = MaterialTheme.typography.labelSmall, maxLines = 1, fontWeight = FontWeight.SemiBold) }
 }
 
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text.uppercase(), style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 6.dp),
-    )
+    Row(modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(4.dp).height(14.dp).clip(RoundedCornerShape(50))
+            .background(Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary))))
+        Spacer(Modifier.width(8.dp))
+        Text(text.uppercase(), style = MaterialTheme.typography.labelSmall, letterSpacing = 1.2.sp, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+    }
 }
 
+/** A tinted glass card that springs a little when pressed. */
 @Composable
-fun Panel(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable () -> Unit) {
+fun Panel(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    tint: Color? = null,
+    content: @Composable () -> Unit,
+) {
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.97f else 1f, label = "press")
+    val t = tint ?: MaterialTheme.colorScheme.primary
+    val surface = MaterialTheme.colorScheme.surface
+    val shape = RoundedCornerShape(16.dp)
     Box(
         modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it },
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(shape)
+            .background(Brush.linearGradient(listOf(t.copy(alpha = 0.13f).compositeOver(surface), surface.copy(alpha = 0.92f))))
+            .border(1.dp, Brush.linearGradient(listOf(t.copy(alpha = 0.35f), t.copy(alpha = 0.05f))), shape)
+            .let {
+                if (onClick != null) it.combinedClickable(interactionSource = src, indication = ripple(), onLongClick = onLongClick, onClick = onClick) else it
+            },
     ) { content() }
 }
 
 @Composable
-fun ProgressBar(progress: Float, color: Color = MaterialTheme.colorScheme.primary, modifier: Modifier = Modifier, height: Dp = 4.dp) {
+fun ProgressBar(progress: Float, color: Color = MaterialTheme.colorScheme.primary, modifier: Modifier = Modifier, height: Dp = 5.dp) {
+    val p by animateFloatAsState(progress.coerceIn(0f, 1f), animationSpec = tween(700), label = "progress")
     Box(modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surfaceVariant)) {
-        Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(height).clip(RoundedCornerShape(50)).background(color))
+        if (p > 0f) Box(
+            Modifier.fillMaxWidth(p).height(height).clip(RoundedCornerShape(50))
+                .background(Brush.horizontalGradient(listOf(color.copy(alpha = 0.65f), color))),
+        )
     }
+}
+
+/** Ring gauge for percentages (disk used, CPU…). */
+@Composable
+fun RingGauge(value: Float, color: Color, modifier: Modifier = Modifier, stroke: Dp = 8.dp, content: @Composable () -> Unit = {}) {
+    val v by animateFloatAsState(value.coerceIn(0f, 1f), tween(900), label = "ring")
+    val track = MaterialTheme.colorScheme.surfaceVariant
+    val c2 = MaterialTheme.colorScheme.secondary
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val sw = stroke.toPx()
+            val inset = sw / 2
+            val arcSize = androidx.compose.ui.geometry.Size(size.width - sw, size.height - sw)
+            drawArc(track, -90f, 360f, false, topLeft = Offset(inset, inset), size = arcSize, style = Stroke(sw, cap = StrokeCap.Round))
+            drawArc(Brush.sweepGradient(listOf(color, c2, color)), -90f, 360f * v, false, topLeft = Offset(inset, inset), size = arcSize, style = Stroke(sw, cap = StrokeCap.Round))
+        }
+        content()
+    }
+}
+
+/** Small live line chart with a soft gradient fill. */
+@Composable
+fun Sparkline(values: List<Long>, color: Color, modifier: Modifier = Modifier, fill: Boolean = true) {
+    Canvas(modifier) {
+        if (values.size < 2) return@Canvas
+        val max = (values.maxOrNull() ?: 1L).coerceAtLeast(1L).toFloat()
+        val stepX = size.width / (values.size - 1)
+        val line = Path()
+        values.forEachIndexed { i, v ->
+            val x = i * stepX
+            val y = size.height - (v / max) * size.height * 0.92f
+            if (i == 0) line.moveTo(x, y) else line.lineTo(x, y)
+        }
+        if (fill) {
+            val area = Path()
+            area.addPath(line)
+            area.lineTo(size.width, size.height)
+            area.lineTo(0f, size.height)
+            area.close()
+            drawPath(area, Brush.verticalGradient(listOf(color.copy(alpha = 0.40f), Color.Transparent)))
+        }
+        drawPath(line, color, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+    }
+}
+
+/** Animated shimmering placeholder shown while data loads. */
+@Composable
+fun Modifier.shimmer(): Modifier {
+    val t = rememberInfiniteTransition(label = "shimmer")
+    val x by t.animateFloat(-400f, 1400f, infiniteRepeatable(tween(1300, easing = LinearEasing)), label = "x")
+    val base = MaterialTheme.colorScheme.surfaceVariant
+    val hi = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f).compositeOver(base)
+    return this.background(Brush.linearGradient(listOf(base, hi, base), start = Offset(x, 0f), end = Offset(x + 400f, 200f)))
 }
 
 @Composable
@@ -282,21 +451,57 @@ fun CenterBox(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun LoadingBox() = CenterBox { CircularProgressIndicator() }
+fun LoadingBox() {
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        repeat(6) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(52.dp, 70.dp).clip(RoundedCornerShape(10.dp)).shimmer())
+                Spacer(Modifier.width(12.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.fillMaxWidth(0.7f).height(14.dp).clip(RoundedCornerShape(6.dp)).shimmer())
+                    Box(Modifier.fillMaxWidth(0.45f).height(10.dp).clip(RoundedCornerShape(6.dp)).shimmer())
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun ErrorBox(msg: String, onRetry: () -> Unit) = CenterBox {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Icon(Icons.Filled.CloudOff, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(48.dp))
+        Box(Modifier.size(84.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Bad.copy(alpha = 0.35f), Pink.copy(alpha = 0.15f)))), contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.CloudOff, null, tint = Bad, modifier = Modifier.size(40.dp))
+        }
         Text("Couldn't connect", style = MaterialTheme.typography.titleMedium)
         Text(msg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-        Button(onClick = onRetry) { Text("Retry") }
+        GradientButton("Try again", onClick = onRetry)
     }
 }
 
 @Composable
 fun EmptyBox(text: String) = CenterBox {
-    Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.size(84.dp).clip(CircleShape).background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)))), contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.Inbox, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(38.dp))
+        }
+        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+fun GradientButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
+    val p = MaterialTheme.colorScheme.primary
+    val s = MaterialTheme.colorScheme.secondary
+    Button(
+        onClick = onClick, enabled = enabled, modifier = modifier, shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant),
+        contentPadding = PaddingValues(0.dp),
+    ) {
+        Box(
+            Modifier.background(if (enabled) Brush.horizontalGradient(listOf(p, s)) else SolidColor(Color.Transparent)).padding(horizontal = 22.dp, vertical = 12.dp),
+            contentAlignment = Alignment.Center,
+        ) { Text(text, color = if (enabled) Color(0xFF0B0D10) else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) }
+    }
 }
 
 /** Shows loading / error / content for a [Loadable], with pull-to-refresh. */
@@ -317,9 +522,9 @@ fun <T> LoadableContent(l: Loadable<T>, modifier: Modifier = Modifier, empty: (T
 fun <T> Dropdown(label: String, options: List<T>, selected: T?, text: (T) -> String, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
     Column(modifier) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
         Box {
-            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                 Text(selected?.let(text) ?: "Select…", modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Icon(Icons.Filled.ArrowDropDown, null)
             }
@@ -332,16 +537,53 @@ fun <T> Dropdown(label: String, options: List<T>, selected: T?, text: (T) -> Str
     }
 }
 
+/** Colourful filter chips; each chip gets its own colour from the rainbow palette. */
 @Composable
-fun ChipRow(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
-    androidx.compose.foundation.lazy.LazyRow(
+fun ChipRow(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier, counts: List<Int>? = null) {
+    LazyRow(
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(options.size) { i ->
-            FilterChip(selected = i == selected, onClick = { onSelect(i) }, label = { Text(options[i]) })
+            val on = i == selected
+            val c = if (i == 0) MaterialTheme.colorScheme.primary else Rainbow[(i - 1) % Rainbow.size]
+            val bgAlpha by animateFloatAsState(if (on) 0.9f else 0.14f, label = "chip")
+            Row(
+                Modifier.clip(RoundedCornerShape(50)).background(c.copy(alpha = bgAlpha))
+                    .border(1.dp, c.copy(alpha = 0.5f), RoundedCornerShape(50))
+                    .clickable { onSelect(i) }.padding(horizontal = 14.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(options[i], color = if (on) Color(0xFF0B0D10) else c, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                val n = counts?.getOrNull(i)
+                if (n != null) {
+                    Spacer(Modifier.width(6.dp))
+                    Text(n.toString(), color = if (on) Color(0xFF0B0D10) else c.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
+                }
+            }
         }
+    }
+}
+
+/** A number that smoothly counts to its new value. */
+@Composable
+fun animatedLong(target: Long): Long {
+    val v by animateFloatAsState(target.toFloat(), tween(800), label = "num")
+    return v.toLong()
+}
+
+/** Big stat tile with gradient (dashboard / headers). */
+@Composable
+fun StatTile(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+    Column(
+        modifier.clip(RoundedCornerShape(14.dp))
+            .background(Brush.linearGradient(listOf(color.copy(alpha = 0.28f), color.copy(alpha = 0.08f))))
+            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Text(value, style = MaterialTheme.typography.titleMedium, color = color, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }
 

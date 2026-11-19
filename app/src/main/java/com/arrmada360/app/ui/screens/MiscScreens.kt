@@ -89,7 +89,7 @@ private val REQ_FILTERS = listOf("Pending" to "pending", "Approved" to "approved
 fun SeerrScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
     val api = remember(cfg) { SeerrApi(cfg) }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
-    AppScaffold(title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type,
+    AppScaffold(title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
         tabs = listOf("Requests", "Discover"), selectedTab = tab, onTab = { tab = it }) { pad ->
         Box(Modifier.padding(pad)) {
             if (tab == 0) RequestsTab(api) else DiscoverTab(api)
@@ -208,7 +208,7 @@ private fun DiscoverTab(api: SeerrApi) {
 fun TautulliScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
     val api = remember(cfg) { TautulliApi(cfg) }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
-    AppScaffold(title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type,
+    AppScaffold(title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
         tabs = listOf("Activity", "History", "Stats"), selectedTab = tab, onTab = { tab = it }) { pad ->
         Box(Modifier.padding(pad)) {
             when (tab) {
@@ -297,7 +297,7 @@ private fun ActivityTab(api: TautulliApi) {
 fun UnraidScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
     val api = remember(cfg) { UnraidApi(cfg) }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
-    AppScaffold(title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type,
+    AppScaffold(title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
         tabs = listOf("Overview", "Docker", "VMs"), selectedTab = tab, onTab = { tab = it }) { pad ->
         Box(Modifier.padding(pad)) {
             when (tab) {
@@ -354,8 +354,16 @@ private fun UnraidOverview(api: UnraidApi) {
                             }
                             if (a.total > 0) {
                                 val p = a.used.toFloat() / a.total
-                                ProgressBar(p, color = if (p > 0.9f) Bad else MaterialTheme.colorScheme.primary, height = 8.dp)
-                                Text("${humanBytes(a.used)} used of ${humanBytes(a.total)} · ${humanBytes(a.total - a.used)} free", style = MaterialTheme.typography.bodySmall)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    com.arrmada360.app.ui.RingGauge(p, if (p > 0.9f) Bad else MaterialTheme.colorScheme.primary, Modifier.size(96.dp), stroke = 10.dp) {
+                                        Text("${(p * 100).toInt()}%", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(Modifier.width(16.dp))
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        com.arrmada360.app.ui.StatTile("Used", humanBytes(a.used), MaterialTheme.colorScheme.primary)
+                                        com.arrmada360.app.ui.StatTile("Free", humanBytes(a.total - a.used), Good)
+                                    }
+                                }
                             }
                         }
                     }

@@ -76,6 +76,14 @@ object DownloadClients {
             else -> null
         }?.also { cache[cfg] = it }
     }
+
+    /** Snapshot + record speeds for the live charts. */
+    suspend fun snapshot(c: DownloadClient): DlSnapshot {
+        val s = c.snapshot()
+        SpeedHistory.record(c.cfg.id, s.dlSpeed, s.upSpeed)
+        SpeedHistory.active[c.cfg.id] = s.items.count { !it.done && !it.paused }
+        return s
+    }
 }
 
 private fun etaOf(left: Long, speed: Long): Long = if (speed > 0) left / speed else -1

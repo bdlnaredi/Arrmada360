@@ -17,6 +17,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import com.arrmada360.app.api.Conn
+import com.arrmada360.app.api.Connections
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -67,6 +74,7 @@ sealed interface Route {
     data object AddService : Route
     data class EditService(val id: String?, val type: ServiceType?) : Route
     data class Search(val term: String = "") : Route
+    data object Health : Route
 }
 
 class Navigator {
@@ -92,6 +100,7 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
     }
 
     val current = nav.current
+    androidx.compose.runtime.LaunchedEffect(ConfigStore.services.size) { Connections.checkAll() }
     CompositionLocalProvider(LocalOpenDrawer provides { scope.launch { drawer.open() } }) {
         ModalNavigationDrawer(
             drawerState = drawer,
@@ -121,6 +130,7 @@ private fun RouteContent(r: Route, nav: Navigator) {
     when (r) {
         Route.Dashboard -> DashboardScreen(nav)
         Route.Settings -> SettingsScreen(nav, isRoot, back)
+        Route.Health -> com.arrmada360.app.ui.screens.HealthScreen(nav, isRoot, back)
         Route.AddService -> ServicePickerScreen(
             title = "Add a service", subtitle = "Pick an app to connect",
             multi = false, initial = emptySet(), onBack = back,
@@ -162,47 +172,73 @@ private fun ServiceRoot(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, bac
 
 @Composable
 private fun DrawerContent(current: Route, go: (Route) -> Unit) {
-    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
-            Row(Modifier.padding(horizontal = 8.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(painterResource(R.drawable.ic_launcher_foreground), null, tint = androidx.compose.ui.graphics.Color.Unspecified, modifier = Modifier.size(44.dp))
-                Spacer(Modifier.width(8.dp))
-                Column {
-                    Text("Arrmada360", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("Every feature. Free.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            val colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = androidx.compose.ui.graphics.Color.Transparent)
-            NavigationDrawerItem(
-                label = { Text("Dashboard") }, selected = current == Route.Dashboard,
-                icon = { Icon(Icons.Filled.Dashboard, null) }, onClick = { go(Route.Dashboard) }, colors = colors,
-            )
-            NavigationDrawerItem(
-                label = { Text("Search everything") }, selected = current is Route.Search,
-                icon = { Icon(Icons.Filled.Search, null) },
-                onClick = { go(Route.Search()) }, colors = colors,
-            )
-            Category.entries.forEach { cat ->
-                val list = ConfigStore.services.filter { it.type.category == cat }
-                if (list.isNotEmpty()) {
-                    SectionTitle(cat.title, Modifier.padding(top = 4.dp))
-                    list.forEach { s ->
-                        NavigationDrawerItem(
-                            label = { Text(s.name) },
-                            selected = (current as? Route.Service)?.id == s.id,
-                            icon = { ServiceBadge(s.type, 28.dp) },
-                            onClick = { go(Route.Service(s.id)) },
-                            colors = colors,
-                        )
+    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background) {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            Box(
+                Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Accent.copy(alpha = 0.55f), Accent2.copy(alpha = 0.45f), Pink.copy(alpha = 0.30f))))
+                    .padding(horizontal = 20.dp, vertical = 28.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(painterResource(R.drawable.ic_launcher_foreground), null, tint = Color.Unspecified, modifier = Modifier.size(56.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text("Arrmada360", style = MaterialTheme.typography.headlineSmall, color = Color.White)
+                        val online = ConfigStore.services.count { Connections.of(it.id) is Conn.Ok }
+                        Text("${ConfigStore.services.size} apps · $online online", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f))
                     }
                 }
             }
-            HorizontalDivider(Modifier.padding(vertical = 12.dp))
-            NavigationDrawerItem(
-                label = { Text("Settings") }, selected = current == Route.Settings,
-                icon = { Icon(Icons.Filled.Settings, null) }, onClick = { go(Route.Settings) }, colors = colors,
-            )
-            Spacer(Modifier.height(24.dp))
+            Column(Modifier.padding(horizontal = 12.dp)) {
+                Spacer(Modifier.height(8.dp))
+                val colors = NavigationDrawerItemDefaults.colors(
+                    unselectedContainerColor = Color.Transparent,
+                    selectedContainerColor = Accent.copy(alpha = 0.18f),
+                )
+                NavigationDrawerItem(
+                    label = { Text("Dashboard") }, selected = current == Route.Dashboard,
+                    icon = { Icon(Icons.Filled.Dashboard, null, tint = Accent) }, onClick = { go(Route.Dashboard) }, colors = colors,
+                )
+                NavigationDrawerItem(
+                    label = { Text("Search everything") }, selected = current is Route.Search,
+                    icon = { Icon(Icons.Filled.Search, null, tint = Accent2) }, onClick = { go(Route.Search()) }, colors = colors,
+                )
+                NavigationDrawerItem(
+                    label = { Text("Connection check") }, selected = current == Route.Health,
+                    icon = { Icon(Icons.Filled.Wifi, null, tint = Good) }, onClick = { go(Route.Health) }, colors = colors,
+                )
+                Category.entries.forEach { cat ->
+                    val list = ConfigStore.services.filter { it.type.category == cat }
+                    if (list.isNotEmpty()) {
+                        SectionTitle(cat.title, Modifier.padding(top = 4.dp))
+                        list.forEach { s ->
+                            val st = Connections.of(s.id)
+                            NavigationDrawerItem(
+                                label = { Text(s.name, fontWeight = FontWeight.Medium) },
+                                selected = (current as? Route.Service)?.id == s.id,
+                                icon = { ServiceBadge(s.type, 32.dp, s.name) },
+                                badge = {
+                                    when (st) {
+                                        is Conn.Ok -> StatusDot(Good)
+                                        is Conn.Fail -> StatusDot(Bad)
+                                        else -> {}
+                                    }
+                                },
+                                onClick = { go(Route.Service(s.id)) },
+                                colors = NavigationDrawerItemDefaults.colors(
+                                    unselectedContainerColor = Color.Transparent,
+                                    selectedContainerColor = s.type.tint.copy(alpha = 0.20f),
+                                ),
+                            )
+                        }
+                    }
+                }
+                HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                NavigationDrawerItem(
+                    label = { Text("Settings") }, selected = current == Route.Settings,
+                    icon = { Icon(Icons.Filled.Settings, null) }, onClick = { go(Route.Settings) }, colors = colors,
+                )
+                Spacer(Modifier.height(24.dp))
+            }
         }
     }
 }
