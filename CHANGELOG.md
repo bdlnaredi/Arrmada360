@@ -4,11 +4,11 @@ All notable changes to Arrmada360 are listed here, newest first.
 Every successful build on `main` is published as **`Arrmada360.apk`** in the [latest release](../../releases/latest).
 The app version is `1.0.<build number>`. The build number is shown in *Settings* and in the release title.
 
-Builds #2, #5, #10 and #15 failed to compile in CI and were fixed straight away in builds #3, #6, #11 and #16, so there is no APK for them.
+Builds #2, #5, #10, #15, #18 and #19 failed to compile in CI and were fixed straight away in builds #3, #6, #11, #16 and #20, so there is no APK for them.
 
 ---
 
-## [1.0.18] – 2026-11-19
+## [1.0.20] – 2026-11-19
 
 ### Added
 - **Local ⇄ remote connection switching** (like nzb360):
