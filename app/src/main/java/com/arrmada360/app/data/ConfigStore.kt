@@ -69,13 +69,14 @@ object Pref {
     const val NOTIFY_READARR = "notify_READARR"
     const val NOTIFY_SEERR = "notify_SEERR"
     const val NOTIFY_DOWNLOADS = "notify_DOWNLOADS"
+    const val AUTO_UPDATE_CHECK = "autoUpdateCheck"
 
     val defaults: Map<String, Boolean> = mapOf(
         VOLUME_NAV to false, DRAWER_GESTURE to true, SWIPE_DOWNLOADS to true, BACK_TO_DASHBOARD to true,
         FRIENDLY_NAMES to false, SPEED_BITS to false, AUTO_CLEAR_SEARCH to true, WHATS_NEW to true,
         AUTH_SETTINGS to false, CRASH_LOGS to true,
         NOTIFY to false, NOTIFY_RADARR to true, NOTIFY_SONARR to true, NOTIFY_LIDARR to true,
-        NOTIFY_READARR to true, NOTIFY_SEERR to true, NOTIFY_DOWNLOADS to false,
+        NOTIFY_READARR to true, NOTIFY_SEERR to true, NOTIFY_DOWNLOADS to false, AUTO_UPDATE_CHECK to true,
     )
 }
 

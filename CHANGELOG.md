@@ -8,6 +8,17 @@ Builds #2, #5, #10 and #15 failed to compile in CI and were fixed straight away 
 
 ---
 
+## [1.0.17] – 2026-11-19
+
+### Added
+- **In-app updates**: Arrmada360 checks this repo's latest build, shows what changed since your version, then downloads and installs the new APK in one tap with a progress bar.
+  - Automatic check when the app opens (at most every 6 hours), with *Update now*, *Later* and *Skip this build*.
+  - A background notification when a new build is out, if notifications are on.
+  - **Settings → Updates & changelog**: current and latest build, download & install, full **changelog viewer**, and a link to the GitHub release.
+  - *Check for updates automatically* switch in General settings and on the Updates page.
+  - `arrmada360://updates` deep link.
+- **What's New** after an update now shows the real changelog for the builds you just got.
+
 ## [1.0.16] – 2026-11-19
 
 ### Changed

@@ -59,12 +59,13 @@ object Notifier {
     fun canPost(ctx: Context): Boolean = Build.VERSION.SDK_INT < 33 ||
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
-    fun post(ctx: Context, id: Int, title: String, text: String, serviceId: String?) {
+    fun post(ctx: Context, id: Int, title: String, text: String, serviceId: String?, link: String? = null) {
         if (!canPost(ctx)) return
         ensureChannel(ctx)
         val intent = Intent(ctx, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            if (serviceId != null) data = android.net.Uri.parse("arrmada360://service/$serviceId")
+            if (link != null) data = android.net.Uri.parse(link)
+            else if (serviceId != null) data = android.net.Uri.parse("arrmada360://service/$serviceId")
         }
         val pi = PendingIntent.getActivity(ctx, id, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val n = NotificationCompat.Builder(ctx, CHANNEL)
@@ -87,7 +88,22 @@ class NotifyWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         ConfigStore.services.toList().forEach { c ->
             try { check(c) } catch (e: Exception) { /* server offline – try again next time */ }
         }
+        try { checkUpdate() } catch (e: Exception) { }
         return Result.success()
+    }
+
+    /** At most once every 12 hours: tell the user a new Arrmada360 build is out. */
+    private suspend fun checkUpdate() {
+        if (!ConfigStore.flag(Pref.AUTO_UPDATE_CHECK)) return
+        val now = System.currentTimeMillis()
+        if (now - ConfigStore.getString("updateWorkerCheck").toLongOrNull().let { it ?: 0L } < 12 * 3600_000L) return
+        ConfigStore.putString("updateWorkerCheck", now.toString())
+        val info = com.arrmada360.app.api.Updates.latest()
+        val current = com.arrmada360.app.api.Updates.currentBuild(applicationContext)
+        if (info.build > current && ConfigStore.getInt("updateNotified", 0) < info.build) {
+            ConfigStore.putInt("updateNotified", info.build)
+            Notifier.post(applicationContext, 360_360, "Arrmada360 update available", "Build #${info.build} is ready – tap to see what's new and install.", null, "arrmada360://updates")
+        }
     }
 
     private suspend fun check(c: ServiceConfig) {

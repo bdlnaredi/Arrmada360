@@ -87,6 +87,8 @@ sealed interface Route {
     data object SettingsDeepLinks : Route
     data object SettingsAppearance : Route
     data object SettingsDiscovery : Route
+    data object Updates : Route
+    data object Changelog : Route
 }
 
 /** Lets deep links pick a dashboard bottom tab. */
@@ -145,12 +147,14 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
                 "search" -> nav.root(Route.Search())
                 "health" -> nav.root(Route.Health)
                 "settings" -> nav.root(Route.Settings)
+                "updates" -> { nav.root(Route.Dashboard); nav.push(Route.Updates) }
                 else -> nav.root(Route.Dashboard)
             }
             com.arrmada360.app.data.AppEvents.deepLink.resetReplayCache()
         }
     }
     com.arrmada360.app.ui.screens.WhatsNewGate()
+    com.arrmada360.app.ui.screens.UpdateGate(nav)
     CompositionLocalProvider(LocalOpenDrawer provides { scope.launch { drawer.open() } }) {
         ModalNavigationDrawer(
             drawerState = drawer,
@@ -185,6 +189,8 @@ private fun RouteContent(r: Route, nav: Navigator) {
         Route.SettingsBackup -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.BackupScreen(back) }
         Route.SettingsNotifications -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.NotificationsScreen(nav, back) }
         Route.SettingsDeepLinks -> com.arrmada360.app.ui.screens.DeepLinksScreen(back)
+        Route.Updates -> com.arrmada360.app.ui.screens.UpdatesScreen(nav, back)
+        Route.Changelog -> com.arrmada360.app.ui.screens.ChangelogScreen(back)
         Route.SettingsAppearance -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.AppearanceScreen(back) }
         Route.SettingsDiscovery -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.DiscoverySettingsScreen(back) }
         Route.Health -> com.arrmada360.app.ui.screens.HealthScreen(nav, isRoot, back)

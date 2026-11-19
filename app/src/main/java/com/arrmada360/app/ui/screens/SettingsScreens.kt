@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -45,6 +47,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Swipe
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
@@ -253,7 +256,8 @@ fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
                 SettingLink(Icons.Filled.Notifications, "Notifications", if (ConfigStore.flag(Pref.NOTIFY)) "On – checking your servers in the background" else "Off", tint = Rainbow[3]) { nav.push(Route.SettingsNotifications) }
                 SettingLink(Icons.Filled.Inventory2, "Backup & restore", "Save everything to a .zip or move to a new phone", tint = Good) { nav.push(Route.SettingsBackup) }
                 SettingLink(Icons.Filled.Palette, "Appearance", if (ConfigStore.amoled) "AMOLED black · ${ConfigStore.gridColumns} poster columns" else "Dark · ${ConfigStore.gridColumns} poster columns", tint = Rainbow[2]) { nav.push(Route.SettingsAppearance) }
-                SettingLink(Icons.Filled.Explore, "Discovery sources", "Trakt, TMDB and Seerr for the Movies & TV tabs", tint = Accent2, divider = false) { nav.push(Route.SettingsDiscovery) }
+                SettingLink(Icons.Filled.Explore, "Discovery sources", "Trakt, TMDB and Seerr for the Movies & TV tabs", tint = Accent2) { nav.push(Route.SettingsDiscovery) }
+                SettingLink(Icons.Filled.SystemUpdate, "Updates & changelog", "Version $ver – check for a new build, see what's changed", tint = Accent, divider = false) { nav.push(Route.Updates) }
             }
         }
         item {
@@ -301,7 +305,8 @@ fun GeneralSettingsScreen(nav: Navigator, back: () -> Unit) {
                 SettingSwitch("Friendly service names", "Show \"Movies, TV Shows, Music\" instead of \"Radarr, Sonarr, Lidarr\".", ConfigStore.flag(Pref.FRIENDLY_NAMES)) { ConfigStore.setFlag(Pref.FRIENDLY_NAMES, it) }
                 SettingSwitch("Show speeds as bits", "Display download speeds as bits instead of bytes (500 Mbps vs 62 MB/s).", ConfigStore.flag(Pref.SPEED_BITS)) { ConfigStore.setFlag(Pref.SPEED_BITS, it) }
                 SettingSwitch("Auto-clear searches in *arr views", "Clear the library filter after opening a searched item.", ConfigStore.flag(Pref.AUTO_CLEAR_SEARCH)) { ConfigStore.setFlag(Pref.AUTO_CLEAR_SEARCH, it) }
-                SettingSwitch("Show What's New on update", "Show a screen with all the changes when Arrmada360 updates to a new version.", ConfigStore.flag(Pref.WHATS_NEW), divider = false) { ConfigStore.setFlag(Pref.WHATS_NEW, it) }
+                SettingSwitch("Show What's New on update", "Show a screen with all the changes when Arrmada360 updates to a new version.", ConfigStore.flag(Pref.WHATS_NEW)) { ConfigStore.setFlag(Pref.WHATS_NEW, it) }
+                SettingSwitch("Check for updates automatically", "Tell me when a new Arrmada360 build is available and install it in one tap.", ConfigStore.flag(Pref.AUTO_UPDATE_CHECK), divider = false) { ConfigStore.setFlag(Pref.AUTO_UPDATE_CHECK, it) }
             }
         }
         item {
@@ -547,6 +552,7 @@ fun DeepLinksScreen(back: () -> Unit) {
         "arrmada360://search" to "Search everything",
         "arrmada360://health" to "Connection check",
         "arrmada360://settings" to "Settings",
+        "arrmada360://updates" to "Check for updates",
     ) + ConfigStore.services.map { "arrmada360://service/${android.net.Uri.encode(it.name)}" to it.name }
     SettingsPage("Deep links", back) {
         item {
@@ -634,16 +640,24 @@ fun WhatsNewGate() {
     val ctx = LocalContext.current
     val (ver, code) = appVersion(ctx)
     var show by remember { mutableStateOf(false) }
+    var notes by remember { mutableStateOf("") }
     LaunchedEffect(code) {
         val last = ConfigStore.getInt("lastVersionCode", 0)
-        if (last != 0 && code > last && ConfigStore.flag(Pref.WHATS_NEW)) show = true
         ConfigStore.putInt("lastVersionCode", code.toInt())
+        if (last != 0 && code > last && ConfigStore.flag(Pref.WHATS_NEW)) {
+            notes = try {
+                val all = com.arrmada360.app.api.Updates.notesSince(com.arrmada360.app.api.Updates.changelog(), last)
+                all.lines().filterNot { it.startsWith("## [Unreleased") }.joinToString("\n")
+            } catch (e: Exception) { "" }
+            show = true
+        }
     }
     if (show) AlertDialog(
         onDismissRequest = { show = false },
         title = { Text("What's new in $ver", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (notes.isNotBlank()) Column(Modifier.heightIn(max = 460.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) { MarkdownText(notes) }
+            else Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 CHANGELOG.forEachIndexed { i, line ->
                     Row {
                         Text("●  ", color = Rainbow[i % Rainbow.size])
