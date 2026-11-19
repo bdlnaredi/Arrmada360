@@ -381,10 +381,13 @@ class TautulliApi(val cfg: ServiceConfig) {
 
 // ======================= Unraid (official GraphQL API, Unraid 7.2+) =======================
 data class UnraidSystem(val hostname: String, val version: String, val uptime: String, val cpu: String, val cpuPercent: Double?, val memUsed: Long, val memTotal: Long)
-data class UnraidDisk(val name: String, val status: String, val temp: Int?, val size: Long, val kind: String, val fsFree: Long, val fsSize: Long)
+data class UnraidDisk(val name: String, val status: String, val temp: Int?, val size: Long, val kind: String, val fsFree: Long, val fsSize: Long, val errors: Int = 0, val spinning: Boolean? = null, val fsType: String = "")
 data class UnraidArray(val state: String, val used: Long, val total: Long, val disks: List<UnraidDisk>)
 data class UnraidContainer(val id: String, val name: String, val state: String, val status: String, val image: String, val autoStart: Boolean)
 data class UnraidVm(val id: String, val name: String, val state: String)
+data class UnraidShare(val name: String, val comment: String, val used: Long, val free: Long, val size: Long, val cache: String)
+data class UnraidNotification(val id: String, val title: String, val subject: String, val description: String, val importance: String, val timestamp: String)
+data class ParityStatus(val status: String, val progress: Double?, val errors: Int?, val running: Boolean, val speed: String, val date: String)
 
 class UnraidApi(val cfg: ServiceConfig) {
     private val client = Http.client(cfg.trustAllCerts)
@@ -440,6 +443,7 @@ class UnraidApi(val cfg: ServiceConfig) {
 
     suspend fun array(): UnraidArray {
         val d = firstOk(
+            "query { array { state capacity { kilobytes { free used total } } parities { name status temp size numErrors isSpinning } disks { name status temp size fsFree fsSize fsType numErrors isSpinning } caches { name status temp size fsFree fsSize fsType numErrors isSpinning } } }",
             "query { array { state capacity { kilobytes { free used total } } parities { name status temp size } disks { name status temp size fsFree fsSize } caches { name status temp size fsFree fsSize } } }",
             "query { array { state capacity { kilobytes { free used total } } parities { name status temp } disks { name status temp } caches { name status temp } } }",
             "query { array { state capacity { kilobytes { free used total } } } }",
@@ -448,7 +452,8 @@ class UnraidApi(val cfg: ServiceConfig) {
         val kb = a.obj("capacity")?.obj("kilobytes")
         fun disks(key: String, kind: String) = a.arr(key).objects().map {
             UnraidDisk(it.str("name"), it.str("status"), if (it.isNull("temp") || !it.has("temp")) null else it.int("temp"),
-                it.long("size") * 1024, kind, it.long("fsFree") * 1024, it.long("fsSize") * 1024)
+                it.long("size") * 1024, kind, it.long("fsFree") * 1024, it.long("fsSize") * 1024,
+                errors = it.int("numErrors"), spinning = if (it.has("isSpinning") && !it.isNull("isSpinning")) it.bool("isSpinning") else null, fsType = it.str("fsType"))
         }
         return UnraidArray(
             state = a.str("state"),
@@ -492,6 +497,60 @@ class UnraidApi(val cfg: ServiceConfig) {
         // action: start | stop | pause | resume | forceStop | reboot
         gql("mutation { vm { $action(id: \"${esc(id)}\") } }")
     }
+
+    suspend fun shares(): List<UnraidShare> {
+        val d = firstOk(
+            "query { shares { name comment free used size cache } }",
+            "query { shares { name free used size } }",
+            "query { shares { name free used } }",
+        )
+        return d.arr("shares").objects().map {
+            UnraidShare(it.str("name"), it.str("comment"), it.long("used") * 1024, it.long("free") * 1024, it.long("size") * 1024, it.str("cache"))
+        }.sortedBy { it.name.lowercase() }
+    }
+
+    suspend fun setArrayState(start: Boolean) {
+        gql("mutation { array { setState(input: { desiredState: ${if (start) "START" else "STOP"} }) { state } } }")
+    }
+
+    suspend fun parityStatus(): ParityStatus? = try {
+        val d = firstOk(
+            "query { array { parityCheckStatus { status progress errors running speed date } } }",
+            "query { parityHistory { date status errors speed } }",
+        )
+        val live = d.obj("array")?.obj("parityCheckStatus")
+        if (live != null) ParityStatus(live.str("status"), if (live.has("progress") && !live.isNull("progress")) live.dbl("progress") else null,
+            if (live.has("errors") && !live.isNull("errors")) live.int("errors") else null, live.bool("running"), live.str("speed"), live.str("date"))
+        else d.arr("parityHistory").objects().firstOrNull()?.let {
+            ParityStatus("Last check: " + it.str("status"), null, it.int("errors"), false, it.str("speed"), it.str("date"))
+        }
+    } catch (e: Exception) { null }
+
+    /** action: start | startCorrect | pause | resume | cancel */
+    suspend fun parity(action: String) {
+        when (action) {
+            "start" -> gql("mutation { parityCheck { start(correct: false) } }")
+            "startCorrect" -> gql("mutation { parityCheck { start(correct: true) } }")
+            else -> gql("mutation { parityCheck { $action } }")
+        }
+    }
+
+    suspend fun notifications(): List<UnraidNotification> {
+        val d = firstOk(
+            "query { notifications { list(filter: { type: UNREAD, offset: 0, limit: 30 }) { id title subject description importance timestamp } } }",
+            "query { notifications { list(filter: { type: UNREAD, offset: 0, limit: 30 }) { id title subject description importance } } }",
+        )
+        return (d.obj("notifications")?.arr("list") ?: JSONArray()).objects().map {
+            UnraidNotification(it.str("id"), it.str("title"), it.str("subject"), it.str("description"), it.str("importance"), it.str("timestamp"))
+        }
+    }
+
+    suspend fun archiveNotification(id: String) {
+        gql("mutation { archiveNotification(id: \"${esc(id)}\") { id } }")
+    }
+
+    /** action: reboot | shutdown */
+    suspend fun power(action: String) { gql("mutation { $action }") }
 
     suspend fun notificationsUnread(): Int = try {
         gql("query { notifications { overview { unread { total } } } }").obj("notifications")?.obj("overview")?.obj("unread")?.int("total") ?: 0

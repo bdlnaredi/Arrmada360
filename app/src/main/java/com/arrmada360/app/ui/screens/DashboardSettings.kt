@@ -1,6 +1,10 @@
 package com.arrmada360.app.ui.screens
 
 import android.content.Intent
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Home
@@ -121,18 +125,17 @@ fun DashboardScreen(nav: Navigator) {
     var pick by rememberSaveable { mutableIntStateOf(0) }
     val requested = com.arrmada360.app.ui.DashboardNav.tab
     androidx.compose.runtime.LaunchedEffect(requested) {
-        if (requested != null) { tab = requested; pick = 0; com.arrmada360.app.ui.DashboardNav.tab = null }
+        if (requested != null) { tab = requested.coerceIn(0, 3); pick = 0; com.arrmada360.app.ui.DashboardNav.tab = null }
     }
     val radarrs = services.filter { it.type == ServiceType.RADARR }
     val sonarrs = services.filter { it.type == ServiceType.SONARR }
-    val instances = when (tab) { 1 -> radarrs; 2 -> sonarrs; else -> emptyList() }
+    val instances = when (tab) { 0 -> radarrs; 1 -> sonarrs; else -> emptyList() }
     AppScaffold(
-        title = when (tab) { 1 -> "Movies"; 2 -> "TV Shows"; 3 -> "Calendar"; 4 -> "Server"; else -> "Arrmada360" },
-        subtitle = if (tab == 0) greeting() else instances.getOrNull(pick)?.name,
+        title = when (tab) { 0 -> "Movies"; 1 -> "TV Shows"; 2 -> "Calendar"; else -> "Server" },
+        subtitle = instances.getOrNull(pick)?.name ?: greeting(),
         isRoot = true, onBack = {},
         tabs = if (instances.size > 1) instances.map { it.name } else emptyList(), selectedTab = pick, onTab = { pick = it },
         bottomTabs = listOf(
-            BottomTab("Home", Icons.Filled.Home),
             BottomTab("Movies", Icons.Filled.Movie),
             BottomTab("TV Shows", Icons.Filled.Tv),
             BottomTab("Calendar", Icons.Filled.CalendarMonth),
@@ -150,52 +153,15 @@ fun DashboardScreen(nav: Navigator) {
             ) { Icon(Icons.Filled.Add, "Add") }
         },
     ) { pad ->
-        if (tab != 0) {
-            Box(Modifier.padding(pad)) {
-                when (tab) {
-                    1, 2 -> {
-                        val c = instances.getOrNull(pick.coerceAtMost((instances.size - 1).coerceAtLeast(0)))
-                        if (c != null) ServiceTheme(c.type, ConfigStore.amoled) { DiscoverTab(tab == 1, c, nav) }
-                        else DiscoverTab(tab == 1, null, nav)
-                    }
-                    3 -> CombinedCalendar(services.filter { it.type.isArr }, nav)
-                    else -> ServerHome(services, nav)
+        Box(Modifier.padding(pad)) {
+            when (tab) {
+                0, 1 -> {
+                    val c = instances.getOrNull(pick.coerceAtMost((instances.size - 1).coerceAtLeast(0)))
+                    if (c != null) ServiceTheme(c.type, ConfigStore.amoled) { DiscoverTab(tab == 0, c, nav) }
+                    else DiscoverTab(tab == 0, null, nav)
                 }
-            }
-            return@AppScaffold
-        }
-        if (services.isEmpty()) {
-            Column(Modifier.padding(pad).padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(Modifier.height(80.dp))
-                Text("No apps yet", style = MaterialTheme.typography.headlineSmall)
-                Spacer(Modifier.height(8.dp))
-                Text("Add Sonarr, Radarr, your download client and more.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(20.dp))
-                GradientButton("Add an app") { nav.push(Route.AddService) }
-            }
-            return@AppScaffold
-        }
-        LazyColumn(Modifier.padding(pad), contentPadding = PaddingValues(bottom = 40.dp)) {
-            item(key = "hero") { HeroCard(services, nav) }
-            item(key = "tiles-title") { SectionTitle("Your apps") }
-            val rows = services.chunked(2)
-            items(rows.size, key = { "row$it" }) { i ->
-                Row(Modifier.padding(horizontal = 12.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    rows[i].forEach { c -> AppTile(c, Modifier.weight(1f), onClick = { nav.root(Route.Service(c.id)) }, onLong = { nav.push(Route.EditService(c.id, null)) }) }
-                    if (rows[i].size == 1) Spacer(Modifier.weight(1f))
-                }
-            }
-            val arrs = services.filter { it.type.isArr }
-            if (arrs.isNotEmpty()) item(key = "upcoming") { UpcomingRow(arrs, nav) }
-            val downloaders = services.filter { it.type.isDownloader }
-            if (downloaders.isNotEmpty()) {
-                item { SectionTitle("Live downloads") }
-                items(downloaders, key = { "dl" + it.id }) { c -> DownloaderCard(c) { nav.root(Route.Service(c.id)) } }
-            }
-            val others = services.filter { it.type == ServiceType.SEERR || it.type == ServiceType.TAUTULLI || it.type == ServiceType.UNRAID }
-            if (others.isNotEmpty()) {
-                item { SectionTitle("At a glance") }
-                items(others, key = { "o" + it.id }) { c -> GlanceCard(c) { nav.root(Route.Service(c.id)) } }
+                2 -> CombinedCalendar(services.filter { it.type.isArr }, nav)
+                else -> ServerInfoTab(services, nav)
             }
         }
     }
@@ -443,37 +409,274 @@ private fun CombinedCalendar(arrs: List<ServiceConfig>, nav: Navigator) {
     }
 }
 
+// ============================================================ Server tab (nzb360 style)
 @Composable
-private fun ServerHome(services: List<ServiceConfig>, nav: Navigator) {
+private fun BigHeader(title: String, color: Color) {
+    Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 26.dp, bottom = 12.dp)) {
+        Box(Modifier.width(72.dp).height(4.dp).clip(RoundedCornerShape(50)).background(color))
+        Spacer(Modifier.height(10.dp))
+        Text(title, style = MaterialTheme.typography.headlineMedium, color = Color.White)
+    }
+}
+
+@Composable
+private fun InfoCard(
+    tint: Color,
+    label: String,
+    title: String,
+    icon: @Composable () -> Unit,
+    onClick: (() -> Unit)? = null,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {},
+) {
+    Column(
+        Modifier.padding(horizontal = 12.dp, vertical = 6.dp).fillMaxWidth().clip(RoundedCornerShape(26.dp))
+            .background(Brush.linearGradient(listOf(tint.copy(alpha = 0.30f), MaterialTheme.colorScheme.surface.copy(alpha = 0.55f))))
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+            .padding(20.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(42.dp), contentAlignment = Alignment.Center) { icon() }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.bodyMedium, color = tint, fontWeight = FontWeight.SemiBold)
+                Text(title, style = MaterialTheme.typography.headlineSmall, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            if (onClick != null) Icon(Icons.Filled.ChevronRight, null, tint = Color.White, modifier = Modifier.size(30.dp))
+        }
+        content()
+    }
+}
+
+@Composable
+private fun PlainIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color = Color.White) = Icon(icon, null, tint = tint, modifier = Modifier.size(34.dp))
+
+@Composable
+fun ServerInfoTab(services: List<ServiceConfig>, nav: Navigator) {
+    if (services.isEmpty()) {
+        Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Spacer(Modifier.height(60.dp))
+            Text("No apps yet", style = MaterialTheme.typography.headlineSmall, color = Color.White)
+            Spacer(Modifier.height(16.dp))
+            GradientButton("Add an app") { nav.push(Route.AddService) }
+        }
+        return
+    }
+    val arrs = services.filter { it.type.isArr }
     val unraids = services.filter { it.type == ServiceType.UNRAID }
-    var view by rememberSaveable { mutableIntStateOf(0) }
-    Column {
-        val tabs = unraids.map { it.name } + "All apps"
-        com.arrmada360.app.ui.PillTabs(tabs, view.coerceAtMost(tabs.size - 1), { view = it })
-        val u = unraids.getOrNull(view)
-        if (u != null) ServiceTheme(u.type, ConfigStore.amoled) { UnraidOverview(remember(u) { com.arrmada360.app.api.UnraidApi(u) }) }
-        else {
-            androidx.compose.runtime.LaunchedEffect(Unit) { Connections.checkAll() }
-            LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
-                items(services, key = { "srv" + it.id }) { c ->
-                    val st = Connections.of(c.id)
-                    Panel(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), tint = c.type.tint, onClick = { nav.root(Route.Service(c.id)) }) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            ServiceBadge(c.type, 40.dp, c.name)
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(c.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
-                                Text(
-                                    when (st) { is Conn.Ok -> "${st.info} · ${st.ms} ms"; is Conn.Fail -> st.msg; is Conn.Checking -> "Checking…"; else -> c.baseUrl },
-                                    style = MaterialTheme.typography.labelSmall, color = if (st is Conn.Fail) Bad else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2,
-                                )
-                            }
-                            when (st) {
-                                is Conn.Ok -> PulseDot(Good)
-                                is Conn.Fail -> PulseDot(Bad, pulsing = false)
-                                else -> CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = c.type.tint)
-                            }
-                        }
+    val downloaders = services.filter { it.type.isDownloader }
+    LazyColumn(contentPadding = PaddingValues(bottom = 40.dp)) {
+        item { BigHeader("Server Info", Good) }
+        item(key = "disk") { DiskSpaceCard(arrs, nav) }
+        item(key = "dlhist") { DownloadHistoryCard(arrs, downloaders) }
+        item(key = "health") { ArrHealthCard(services.filter { it.type.isArr || it.type == ServiceType.PROWLARR }, nav) }
+        if (unraids.isNotEmpty()) {
+            item { BigHeader("Unraid", ServiceType.UNRAID.tint) }
+            items(unraids, key = { "un" + it.id }) { u -> UnraidSummaryCard(u) { nav.root(Route.Service(u.id)) } }
+        }
+        if (downloaders.isNotEmpty()) {
+            item { BigHeader("Live Downloads", Accent) }
+            items(downloaders, key = { "dl" + it.id }) { c -> DownloaderCard(c) { nav.root(Route.Service(c.id)) } }
+        }
+        item { BigHeader("Other Services", Pink) }
+        item(key = "books") { RecentCard(ServiceType.READARR, "Recently Downloaded Books", nav) }
+        item(key = "albums") { RecentCard(ServiceType.LIDARR, "Recently Downloaded Albums", nav) }
+        item { BigHeader("External Server Use", Warn) }
+        item(key = "taut") { TautulliCard(nav) }
+        item(key = "seerr") { SeerrCard(nav) }
+        item { BigHeader("Your Apps", Accent2) }
+        val rows = services.chunked(2)
+        items(rows.size, key = { "row$it" }) { i ->
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                rows[i].forEach { c -> AppTile(c, Modifier.weight(1f), onClick = { nav.root(Route.Service(c.id)) }, onLong = { nav.push(Route.EditService(c.id, null)) }) }
+                if (rows[i].size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiskSpaceCard(arrs: List<ServiceConfig>, nav: Navigator) {
+    val l = rememberLoadable(arrs.map { it.id }, "srvdisk") {
+        coroutineScope {
+            arrs.map { c -> async { try { ArrApi(c).diskSpace() } catch (e: Exception) { emptyList() } } }.awaitAll().flatten()
+                .filter { it.total > 0 }.distinctBy { it.path }.sortedBy { it.path }
+        }
+    }
+    InfoCard(Good, "Server", "Disk Space", { PlainIcon(Icons.Filled.Storage) }) {
+        val d = l.data
+        when {
+            arrs.isEmpty() -> Text("Add Sonarr or Radarr to see disk space", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
+            d == null -> Box(Modifier.padding(top = 14.dp).fillMaxWidth().height(80.dp).clip(RoundedCornerShape(12.dp)).shimmer())
+            d.isEmpty() -> Text("No disks reported", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
+            else -> d.forEach { s ->
+                val used = 1f - s.free.toFloat() / s.total
+                Spacer(Modifier.height(16.dp))
+                Text(s.path, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ProgressBar(used, color = if (used > 0.9f) Bad else Good, modifier = Modifier.weight(1f), height = 7.dp)
+                    Spacer(Modifier.width(14.dp))
+                    Text("${humanBytes(s.free)} free", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(100.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadHistoryCard(arrs: List<ServiceConfig>, downloaders: List<ServiceConfig>) {
+    val l = rememberLoadable(arrs.map { it.id } + downloaders.map { it.id }, "srvhist") {
+        val days = (13 downTo 0).map { java.time.LocalDate.now().minusDays(it.toLong()) }
+        val totals = HashMap<java.time.LocalDate, Long>()
+        coroutineScope {
+            val a = arrs.map { c -> async { try { ArrApi(c).grabbedPerDay(14) } catch (e: Exception) { emptyMap() } } }
+            val u = downloaders.map { c ->
+                async {
+                    try {
+                        val client = DownloadClients.of(c)
+                        if (client == null || !client.hasHistory) emptyMap() else client.history().filter { !it.failed && it.time > 0 }
+                            .groupBy { java.time.Instant.ofEpochSecond(it.time).atZone(java.time.ZoneId.systemDefault()).toLocalDate() }
+                            .mapValues { e -> e.value.sumOf { it.size } }
+                    } catch (e: Exception) { emptyMap() }
+                }
+            }
+            (a.awaitAll() + u.awaitAll()).forEach { m -> m.forEach { (d, b) -> totals[d] = (totals[d] ?: 0L) + b } }
+        }
+        days.map { it to (totals[it] ?: 0L) }
+    }
+    val data = l.data
+    val total = data?.sumOf { it.second } ?: 0L
+    InfoCard(Warn, "Download History", if (data == null) "Loading…" else "${humanBytes(total).replace("0 B", "0 KB")} in last 2 weeks", { PlainIcon(Icons.Filled.Download) }) {
+        Spacer(Modifier.height(16.dp))
+        if (data == null) Box(Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(12.dp)).shimmer())
+        else BarChart(data.map { it.second }, data.first().first, data.last().first)
+    }
+}
+
+@Composable
+private fun BarChart(values: List<Long>, first: java.time.LocalDate, last: java.time.LocalDate) {
+    val max = (values.maxOrNull() ?: 0L).coerceAtLeast(1L)
+    val grid = MaterialTheme.colorScheme.outline
+    val c1 = Warn
+    val c2 = Pink
+    Row(Modifier.fillMaxWidth().height(170.dp)) {
+        Column(Modifier.fillMaxHeight().width(64.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            (4 downTo 0).forEach { i -> Text(if (values.all { it == 0L }) "0 GB" else humanBytes(max * i / 4), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface) }
+        }
+        androidx.compose.foundation.Canvas(Modifier.weight(1f).fillMaxHeight()) {
+            val w = size.width
+            val h = size.height
+            for (i in 0..4) drawLine(grid, androidx.compose.ui.geometry.Offset(w * i / 4f, 0f), androidx.compose.ui.geometry.Offset(w * i / 4f, h), strokeWidth = 1.5f)
+            drawLine(grid, androidx.compose.ui.geometry.Offset(0f, h), androidx.compose.ui.geometry.Offset(w, h), strokeWidth = 1.5f)
+            val bw = w / values.size
+            values.forEachIndexed { i, v ->
+                if (v > 0) {
+                    val bh = h * v / max.toFloat()
+                    drawRoundRect(
+                        Brush.verticalGradient(listOf(c1, c2), startY = h - bh, endY = h),
+                        topLeft = androidx.compose.ui.geometry.Offset(i * bw + bw * 0.18f, h - bh),
+                        size = androidx.compose.ui.geometry.Size(bw * 0.64f, bh),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f),
+                    )
+                }
+            }
+        }
+    }
+    Row(Modifier.fillMaxWidth().padding(start = 64.dp, top = 6.dp)) {
+        Text(fmtDate(first.toString()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+        Text(fmtDate(last.toString()), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun ArrHealthCard(apps: List<ServiceConfig>, nav: Navigator) {
+    val l = rememberLoadable(apps.map { it.id }, "srvhealth") {
+        coroutineScope {
+            apps.map { c -> async { try { ArrApi(c).healthIssues().map { c to it } } catch (e: Exception) { emptyList() } } }.awaitAll().flatten()
+        }
+    }
+    val d = l.data
+    InfoCard(
+        Bad, "From the *arrs",
+        when { apps.isEmpty() -> "No *arr apps added"; d == null -> "Checking…"; d.isEmpty() -> "No Server Issues"; else -> "${d.size} Server Issue${if (d.size == 1) "" else "s"}" },
+        { PlainIcon(Icons.Filled.Info) },
+    ) {
+        d?.take(8)?.forEach { (c, h) ->
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth().clickable { nav.root(Route.Service(c.id)) }, verticalAlignment = Alignment.Top) {
+                ServiceBadge(c.type, 28.dp, c.name)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(c.name + " · " + h.type.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall, color = if (h.type.equals("error", true)) Bad else Warn, fontWeight = FontWeight.Bold)
+                    Text(h.message, style = MaterialTheme.typography.bodySmall, color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UnraidSummaryCard(u: ServiceConfig, onClick: () -> Unit) {
+    val api = remember(u) { UnraidApi(u) }
+    val l = rememberLoadable(u, "srvunraid", autoRefreshMs = 15000) {
+        Triple(
+            try { api.system() } catch (e: Exception) { null },
+            try { api.array() } catch (e: Exception) { null },
+            try { api.containers() } catch (e: Exception) { null },
+        )
+    }
+    val d = l.data
+    InfoCard(u.type.tint, "From ${u.name}", d?.first?.hostname?.ifEmpty { null } ?: u.name, { ServiceBadge(u.type, 40.dp, u.name) }, onClick) {
+        if (d == null) { Spacer(Modifier.height(12.dp)); Box(Modifier.fillMaxWidth().height(70.dp).clip(RoundedCornerShape(12.dp)).shimmer()); return@InfoCard }
+        val (sys, arr, cont) = d
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (arr != null) StatTile("Array", arr.state.lowercase().replaceFirstChar { it.uppercase() }, if (arr.state.equals("STARTED", true)) Good else Warn, Modifier.weight(1f))
+            if (arr != null && arr.total > 0) StatTile("Used", "${arr.used * 100 / arr.total}%", u.type.tint, Modifier.weight(1f))
+            if (cont != null) StatTile("Docker", "${cont.count { it.state.equals("RUNNING", true) }}/${cont.size}", Accent, Modifier.weight(1f))
+        }
+        if (sys != null && (sys.cpuPercent != null || sys.memTotal > 0)) {
+            Spacer(Modifier.height(10.dp))
+            sys.cpuPercent?.let { c -> Text("CPU ${"%.0f".format(c)}%", style = MaterialTheme.typography.labelSmall, color = Color.White); ProgressBar((c / 100).toFloat(), color = u.type.tint) }
+            if (sys.memTotal > 0) { Spacer(Modifier.height(6.dp)); Text("RAM ${humanBytes(sys.memUsed)} / ${humanBytes(sys.memTotal)}", style = MaterialTheme.typography.labelSmall, color = Color.White); ProgressBar(sys.memUsed.toFloat() / sys.memTotal, color = Accent2) }
+        }
+    }
+}
+
+@Composable
+private fun RecentCard(type: ServiceType, title: String, nav: Navigator) {
+    val c = ConfigStore.services.firstOrNull { it.type == type }
+    val l = rememberLoadable(c, "srvrecent") { c?.let { ArrApi(it).recentByHistory() } ?: emptyList() }
+    InfoCard(type.tint, "From ${c?.name ?: type.label}", title, { ServiceBadge(type, 40.dp, c?.name) }, if (c != null) ({ nav.root(Route.Service(c.id)) }) else null) {
+        Spacer(Modifier.height(16.dp))
+        val d = l.data
+        if (c == null || (d != null && d.isEmpty())) {
+            Box(Modifier.fillMaxWidth().height(190.dp), contentAlignment = Alignment.Center) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    repeat(3) { i -> Box(Modifier.weight(1f).height(190.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.08f - i * 0.02f))) }
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(if (c == null) "Enable ${type.label} to Populate" else "Nothing downloaded yet", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.75f))
+                    if (c == null) {
+                        Spacer(Modifier.height(10.dp))
+                        androidx.compose.material3.Button(
+                            onClick = { nav.push(Route.EditService(null, type)) },
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.25f)),
+                            shape = RoundedCornerShape(50),
+                        ) { Text("Go to Settings", color = Color.White, fontWeight = FontWeight.Bold) }
+                    }
+                }
+            }
+        } else if (d == null) {
+            Box(Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(16.dp)).shimmer())
+        } else {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(d, key = { it.id }) { e ->
+                    Column(Modifier.width(118.dp).clickable { nav.push(Route.ArrDetail(c.id, e.parentId)) }) {
+                        Poster(e.poster, Modifier.fillMaxWidth(), ratio = if (type == ServiceType.LIDARR) 1f else 2f / 3f, corner = 14.dp, fallback = e.title)
+                        Spacer(Modifier.height(5.dp))
+                        Text(e.title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(e.subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -481,3 +684,51 @@ private fun ServerHome(services: List<ServiceConfig>, nav: Navigator) {
     }
 }
 
+@Composable
+private fun TautulliCard(nav: Navigator) {
+    val c = ConfigStore.services.firstOrNull { it.type == ServiceType.TAUTULLI }
+    val l = rememberLoadable(c, "srvtaut", autoRefreshMs = 15000) { c?.let { TautulliApi(it).activity() } }
+    val d = l.data
+    val n = d?.first?.size ?: 0
+    InfoCard(
+        ServiceType.TAUTULLI.tint, "From ${c?.name ?: "Tautulli"}",
+        when { c == null -> "Enable Tautulli to see streams"; d == null && l.error != null -> "Offline"; d == null -> "Checking…"; n == 0 -> "No Active Streams"; else -> "$n Active Stream${if (n == 1) "" else "s"}" },
+        { ServiceBadge(ServiceType.TAUTULLI, 40.dp, c?.name) },
+        { if (c != null) nav.root(Route.Service(c.id)) else nav.push(Route.EditService(null, ServiceType.TAUTULLI)) },
+    ) {
+        d?.first?.take(5)?.forEach { s ->
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Poster(s.thumb, Modifier.width(36.dp), corner = 6.dp)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(s.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${s.user} · ${s.decision} · ${s.progress}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeerrCard(nav: Navigator) {
+    val c = ConfigStore.services.firstOrNull { it.type == ServiceType.SEERR }
+    val l = rememberLoadable(c, "srvseerr", autoRefreshMs = 30000) { c?.let { SeerrApi(it).counts() } }
+    val d = l.data
+    val pending = d?.int("pending") ?: 0
+    InfoCard(
+        ServiceType.SEERR.tint, "From ${c?.name ?: "Seerr"}",
+        when { c == null -> "Enable Seerr to see requests"; d == null && l.error != null -> "Offline"; d == null -> "Checking…"; pending == 0 -> "No Pending Requests"; else -> "$pending Pending Request${if (pending == 1) "" else "s"}" },
+        { ServiceBadge(ServiceType.SEERR, 40.dp, c?.name) },
+        { if (c != null) nav.root(Route.Service(c.id)) else nav.push(Route.EditService(null, ServiceType.SEERR)) },
+    ) {
+        if (d != null) {
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatTile("Pending", pending.toString(), Warn, Modifier.weight(1f))
+                StatTile("Processing", d.int("processing").toString(), ServiceType.SEERR.tint, Modifier.weight(1f))
+                StatTile("Available", d.int("available").toString(), Good, Modifier.weight(1f))
+            }
+        }
+    }
+}

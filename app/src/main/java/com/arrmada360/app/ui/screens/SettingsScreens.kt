@@ -543,6 +543,7 @@ fun DeepLinksScreen(back: () -> Unit) {
         "arrmada360://movies" to "Movies tab",
         "arrmada360://tv" to "TV Shows tab",
         "arrmada360://calendar" to "Calendar tab",
+        "arrmada360://server" to "Server tab",
         "arrmada360://search" to "Search everything",
         "arrmada360://health" to "Connection check",
         "arrmada360://settings" to "Settings",

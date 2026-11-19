@@ -479,6 +479,42 @@ class ArrApi(val cfg: ServiceConfig) {
         }
     }
 
+    /** Bytes grabbed per day over the last [days] days (for the dashboard chart). */
+    suspend fun grabbedPerDay(days: Int = 14): Map<java.time.LocalDate, Long> {
+        val since = java.time.LocalDate.now().minusDays(days.toLong() - 1)
+        val q = mapOf("pageSize" to 500, "sortKey" to "date", "sortDirection" to "descending", "eventType" to 1)
+        val out = HashMap<java.time.LocalDate, Long>()
+        fetchList("history", q).forEach { o ->
+            if (!o.str("eventType").let { it.isEmpty() || it == "grabbed" }) return@forEach
+            val d = try { java.time.Instant.parse(o.str("date")).atZone(java.time.ZoneId.systemDefault()).toLocalDate() } catch (e: Exception) { return@forEach }
+            if (d.isBefore(since)) return@forEach
+            val size = o.obj("data")?.str("size")?.toLongOrNull() ?: 0L
+            out[d] = (out[d] ?: 0L) + size
+        }
+        return out
+    }
+
+    /** Recently imported items using history (works for Lidarr albums and Readarr books too). */
+    suspend fun recentByHistory(): List<CalEntry> {
+        val q = mutableMapOf<String, Any?>("pageSize" to 100, "sortKey" to "date", "sortDirection" to "descending", includeParent to true)
+        when (type) {
+            ServiceType.LIDARR -> q["includeAlbum"] = true
+            ServiceType.READARR -> q["includeBook"] = true
+            ServiceType.SONARR -> q["includeEpisode"] = true
+            else -> {}
+        }
+        return fetchList("history", q).filter { it.str("eventType").contains("import", true) }.mapNotNull { o ->
+            val parent = o.obj(parentKey)
+            val child = o.obj("album") ?: o.obj("book") ?: o.obj("episode")
+            val pTitle = parent?.let { p -> p.str("title").ifEmpty { p.str("artistName") }.ifEmpty { p.str("authorName") } } ?: return@mapNotNull null
+            CalEntry(
+                id = child?.int("id") ?: o.int("id"), parentId = parent.int("id"),
+                title = child?.str("title")?.ifEmpty { null } ?: pTitle, subtitle = pTitle,
+                date = o.str("date"), hasFile = true, poster = image(child, "cover", "poster") ?: image(parent, "poster", "cover"),
+            )
+        }.distinctBy { it.id }.take(20)
+    }
+
     /** Missing items. Falls back to library filtering on older Radarr builds without /wanted. */
     suspend fun wanted(): List<CalEntry> {
         return try {

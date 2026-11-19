@@ -138,13 +138,14 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
                     ConfigStore.services.firstOrNull { it.id == key || it.name.equals(key, true) || it.type.name.equals(key, true) }
                         ?.let { nav.root(Route.Service(it.id)) }
                 }
-                "movies" -> { DashboardNav.tab = 1; nav.root(Route.Dashboard) }
-                "tv" -> { DashboardNav.tab = 2; nav.root(Route.Dashboard) }
-                "calendar" -> { DashboardNav.tab = 3; nav.root(Route.Dashboard) }
+                "movies" -> { DashboardNav.tab = 0; nav.root(Route.Dashboard) }
+                "tv" -> { DashboardNav.tab = 1; nav.root(Route.Dashboard) }
+                "calendar" -> { DashboardNav.tab = 2; nav.root(Route.Dashboard) }
+                "server" -> { DashboardNav.tab = 3; nav.root(Route.Dashboard) }
                 "search" -> nav.root(Route.Search())
                 "health" -> nav.root(Route.Health)
                 "settings" -> nav.root(Route.Settings)
-                else -> { DashboardNav.tab = 0; nav.root(Route.Dashboard) }
+                else -> nav.root(Route.Dashboard)
             }
             com.arrmada360.app.data.AppEvents.deepLink.resetReplayCache()
         }
