@@ -19,18 +19,27 @@ data class ServiceConfig(
     val username: String = "",
     val password: String = "",
     val trustAllCerts: Boolean = false,
+    /** Optional address used away from home (Tailscale, domain, reverse proxy…). */
+    val remoteUrl: String = "",
 ) {
+    val localBaseUrl: String get() = normalize(url)
+    val remoteBaseUrl: String? get() = remoteUrl.trim().takeIf { it.isNotEmpty() }?.let { normalize(it) }
+    val hasRemote: Boolean get() = remoteBaseUrl != null
+
+    /** The address to use right now – local at home, remote elsewhere (see [com.arrmada360.app.net.NetSwitch]). */
     val baseUrl: String
-        get() {
-            var u = url.trim()
-            if (!u.startsWith("http://") && !u.startsWith("https://")) u = "http://$u"
-            return u.trimEnd('/')
-        }
+        get() = if (hasRemote && !com.arrmada360.app.net.NetSwitch.useLocal(this)) remoteBaseUrl!! else localBaseUrl
+
+    private fun normalize(raw: String): String {
+        var u = raw.trim()
+        if (!u.startsWith("http://") && !u.startsWith("https://")) u = "http://$u"
+        return u.trimEnd('/')
+    }
 
     fun toJson(): JSONObject = JSONObject()
         .put("id", id).put("type", type.name).put("name", name).put("url", url)
         .put("apiKey", apiKey).put("username", username).put("password", password)
-        .put("trustAllCerts", trustAllCerts)
+        .put("trustAllCerts", trustAllCerts).put("remoteUrl", remoteUrl)
 
     companion object {
         fun fromJson(o: JSONObject): ServiceConfig? = try {
@@ -43,6 +52,7 @@ data class ServiceConfig(
                 username = o.optString("username"),
                 password = o.optString("password"),
                 trustAllCerts = o.optBoolean("trustAllCerts"),
+                remoteUrl = o.optString("remoteUrl"),
             )
         } catch (e: Exception) {
             null
@@ -98,6 +108,11 @@ object ConfigStore {
         private set
     var traktClientId by mutableStateOf("")
         private set
+    /** AUTO, LOCAL or REMOTE. */
+    var connMode by mutableStateOf("AUTO")
+        private set
+    var homeSsids by mutableStateOf(setOf<String>())
+        private set
 
     fun init(ctx: Context) {
         if (::prefs.isInitialized) return
@@ -108,6 +123,8 @@ object ConfigStore {
         tmdbKey = prefs.getString("tmdbKey", "") ?: ""
         Pref.defaults.forEach { (k, d) -> flags[k] = prefs.getBoolean(k, d) }
         imdbOpenWith = prefs.getString("imdbOpenWith", "browser") ?: "browser"
+        connMode = prefs.getString("connMode", "AUTO") ?: "AUTO"
+        homeSsids = prefs.getStringSet("homeSsids", emptySet())?.toSet() ?: emptySet()
         traktClientId = prefs.getString("traktClientId", "") ?: ""
         val arr = try { JSONArray(prefs.getString("services", "[]")) } catch (e: Exception) { JSONArray() }
         for (i in 0 until arr.length()) {
@@ -173,6 +190,18 @@ object ConfigStore {
         prefs.edit().putBoolean(key, v).apply()
     }
 
+    fun updateConnMode(v: String) {
+        connMode = v
+        prefs.edit().putString("connMode", v).apply()
+        com.arrmada360.app.net.NetSwitch.refresh()
+    }
+
+    fun updateHomeSsids(v: Set<String>) {
+        homeSsids = v
+        prefs.edit().putStringSet("homeSsids", v).apply()
+        com.arrmada360.app.net.NetSwitch.refresh()
+    }
+
     fun updateImdbOpenWith(v: String) {
         imdbOpenWith = v
         prefs.edit().putString("imdbOpenWith", v).apply()
@@ -195,6 +224,7 @@ object ConfigStore {
             .put("app", "Arrmada360").put("backupVersion", 2).put("services", arr).put("prefs", p)
             .put("amoled", amoled).put("gridColumns", gridColumns)
             .put("tmdbKey", tmdbKey).put("traktClientId", traktClientId).put("imdbOpenWith", imdbOpenWith)
+            .put("connMode", connMode).put("homeSsids", JSONArray(homeSsids.toList()))
             .toString(2)
     }
 
@@ -211,6 +241,8 @@ object ConfigStore {
         if (o.has("gridColumns")) updateGridColumns(o.optInt("gridColumns", 3))
         if (o.has("tmdbKey") || o.has("traktClientId")) updateDiscoverKeys(o.optString("tmdbKey"), o.optString("traktClientId"))
         if (o.has("imdbOpenWith")) updateImdbOpenWith(o.optString("imdbOpenWith", "browser"))
+        if (o.has("connMode")) updateConnMode(o.optString("connMode", "AUTO"))
+        o.optJSONArray("homeSsids")?.let { a -> updateHomeSsids((0 until a.length()).map { a.optString(it) }.toSet()) }
         if (list.isNotEmpty()) finishOnboarding()
         return list.size
     }

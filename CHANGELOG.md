@@ -8,6 +8,17 @@ Builds #2, #5, #10 and #15 failed to compile in CI and were fixed straight away 
 
 ---
 
+## [1.0.18] – 2026-11-19
+
+### Added
+- **Local ⇄ remote connection switching** (like nzb360):
+  - Every app now has a **🏠 local address** and an optional **🌍 remote address** (Tailscale, domain or reverse proxy). *Test* checks both.
+  - **Automatic** mode: local on your **home Wi-Fi networks**, remote on any other Wi-Fi or mobile data. If you haven't added home networks, or Android hides the Wi-Fi name, the app quickly tests each local address on Wi-Fi and uses it when it answers.
+  - **Always local** and **Always remote** modes.
+  - It switches as soon as your network changes, and re-checks every connection.
+  - **Settings → Connection switching**: current status, mode, home Wi-Fi list (*Add current Wi-Fi network*), and which address every app is using right now.
+  - 🏠 / 🌍 indicator in the side menu. Background notifications use the same switching.
+
 ## [1.0.17] – 2026-11-19
 
 ### Added

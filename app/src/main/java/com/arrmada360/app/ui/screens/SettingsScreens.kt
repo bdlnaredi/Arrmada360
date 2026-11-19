@@ -253,6 +253,7 @@ fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
         item {
             SettingsGroup("Settings") {
                 SettingLink(Icons.Filled.Tune, "General settings", "Navigation, interface, IMDb links, security", tint = Rainbow[0]) { nav.push(Route.SettingsGeneral) }
+                SettingLink(Icons.Filled.Wifi, "Connection switching", com.arrmada360.app.net.NetSwitch.describe(), tint = Good) { nav.push(Route.SettingsConnection) }
                 SettingLink(Icons.Filled.Notifications, "Notifications", if (ConfigStore.flag(Pref.NOTIFY)) "On – checking your servers in the background" else "Off", tint = Rainbow[3]) { nav.push(Route.SettingsNotifications) }
                 SettingLink(Icons.Filled.Inventory2, "Backup & restore", "Save everything to a .zip or move to a new phone", tint = Good) { nav.push(Route.SettingsBackup) }
                 SettingLink(Icons.Filled.Palette, "Appearance", if (ConfigStore.amoled) "AMOLED black · ${ConfigStore.gridColumns} poster columns" else "Dark · ${ConfigStore.gridColumns} poster columns", tint = Rainbow[2]) { nav.push(Route.SettingsAppearance) }
@@ -674,3 +675,100 @@ fun WhatsNewGate() {
 private val keepLock = Icons.Filled.Lock
 @Suppress("unused")
 private fun keepAlign() = TextAlign.Center
+
+// ============================================================ Connection switching (local ⇄ remote)
+@Composable
+fun ConnectionSwitchScreen(back: () -> Unit) {
+    val ctx = LocalContext.current
+    val ns = com.arrmada360.app.net.NetSwitch
+    val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) { ns.refresh(); ctx.toast("Tap “Add current Wi-Fi” again") } else ctx.toast("Without location access Android hides the Wi-Fi name – Auto will test local addresses instead")
+    }
+    val v = ns.version
+    if (v < 0) Text("")
+    SettingsPage("Connection switching", back) {
+        item {
+            Box(
+                Modifier.padding(14.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp))
+                    .background(Brush.linearGradient(listOf(Good.copy(alpha = 0.35f), Accent.copy(alpha = 0.25f)))).padding(18.dp),
+            ) {
+                Column {
+                    Text(if (ConfigStore.services.filter { it.hasRemote }.all { ns.useLocal(it) }) "🏠  Local connection" else "🌍  Remote connection",
+                        style = MaterialTheme.typography.headlineSmall, color = Color.White)
+                    Text(ns.describe(), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
+                    Spacer(Modifier.height(10.dp))
+                    GradientButton("Re-check network now") { ns.refresh(); ctx.toast("Re-checking…") }
+                }
+            }
+        }
+        item {
+            SettingsGroup("Mode") {
+                listOf(
+                    Triple("AUTO", "Automatic (recommended)", "Local on your home Wi-Fi, remote everywhere else"),
+                    Triple("LOCAL", "Always local", "Use local addresses even on mobile data (e.g. Tailscale subnet routing)"),
+                    Triple("REMOTE", "Always remote", "Always use the remote address when one is set"),
+                ).forEachIndexed { i, (k, t, sub) ->
+                    Row(Modifier.fillMaxWidth().clickable { ConfigStore.updateConnMode(k) }.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(ConfigStore.connMode == k, { ConfigStore.updateConnMode(k) })
+                        Column(Modifier.weight(1f)) {
+                            Text(t, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (i < 2) GroupDivider()
+                }
+            }
+        }
+        item {
+            SettingsGroup("Home Wi-Fi networks") {
+                Text(
+                    if (ConfigStore.homeSsids.isEmpty()) "None added – on Wi-Fi, Arrmada360 quickly tests each local address and uses it if it answers."
+                    else "On these networks local addresses are used; on any other network the remote address is used.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(20.dp),
+                )
+                ConfigStore.homeSsids.sorted().forEach { s ->
+                    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Wifi, null, tint = Good)
+                        Spacer(Modifier.width(12.dp))
+                        Text(s, style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
+                        if (s == ns.ssid) Pill("Connected", Good)
+                        IconButton(onClick = { ConfigStore.updateHomeSsids(ConfigStore.homeSsids - s) }) { Icon(Icons.Filled.DeleteSweep, "Remove", tint = Bad) }
+                    }
+                }
+                GroupDivider()
+                SettingLink(Icons.Filled.Add, "Add current Wi-Fi network", ns.ssid?.let { "Connected to “$it”" } ?: if (!ns.onWifi) "Connect to your home Wi-Fi first" else "Needs location permission to read the network name", tint = Accent, divider = false) {
+                    when {
+                        !ns.onWifi -> ctx.toast("You're not on Wi-Fi")
+                        !ns.hasLocationPermission() -> perm.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                        ns.ssid == null -> { ns.refresh(); ctx.toast("Couldn't read the Wi-Fi name – make sure Location is turned on") }
+                        else -> { ConfigStore.updateHomeSsids(ConfigStore.homeSsids + ns.ssid!!); ctx.toast("Added ${ns.ssid}") }
+                    }
+                }
+            }
+        }
+        item {
+            SettingsGroup("Your apps right now") {
+                val list = ConfigStore.services.toList()
+                if (list.none { it.hasRemote }) Text("No app has a remote address yet. Edit an app and fill in “Remote address” to enable switching.",
+                    style = MaterialTheme.typography.bodySmall, color = Warn, modifier = Modifier.padding(20.dp))
+                list.forEachIndexed { i, c ->
+                    val local = !c.hasRemote || ns.useLocal(c)
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ServiceBadge(c.type, 36.dp, c.name)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(c.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(c.baseUrl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        when {
+                            !c.hasRemote -> Pill("Local only", MaterialTheme.colorScheme.outline)
+                            local -> Pill("🏠 Local", Good)
+                            else -> Pill("🌍 Remote", Accent2)
+                        }
+                    }
+                    if (i < list.size - 1) GroupDivider()
+                }
+            }
+        }
+    }
+}

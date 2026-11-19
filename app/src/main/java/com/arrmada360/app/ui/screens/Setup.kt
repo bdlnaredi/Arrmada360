@@ -258,6 +258,8 @@ fun ServiceEditorScreen(
     val k = existing?.id ?: type.name
     var name by remember(k) { mutableStateOf(existing?.name ?: type.label) }
     var url by remember(k) { mutableStateOf(existing?.url ?: "") }
+    var remote by remember(k) { mutableStateOf(existing?.remoteUrl ?: "") }
+    var remoteResult by remember(k) { mutableStateOf<Pair<Boolean, String>?>(null) }
     var apiKey by remember(k) { mutableStateOf(existing?.apiKey ?: "") }
     var user by remember(k) { mutableStateOf(existing?.username ?: if (type == ServiceType.QBITTORRENT) "admin" else if (type == ServiceType.NZBGET) "nzbget" else "") }
     var pass by remember(k) { mutableStateOf(existing?.password ?: "") }
@@ -270,7 +272,7 @@ fun ServiceEditorScreen(
     fun build() = ServiceConfig(
         id = existing?.id ?: java.util.UUID.randomUUID().toString(),
         type = type, name = name.trim().ifEmpty { type.label }, url = url.trim(),
-        apiKey = apiKey.trim(), username = user.trim(), password = pass, trustAllCerts = trust,
+        apiKey = apiKey.trim(), username = user.trim(), password = pass, trustAllCerts = trust, remoteUrl = remote.trim(),
     )
 
     ServiceTheme(type, ConfigStore.amoled) {
@@ -294,9 +296,16 @@ fun ServiceEditorScreen(
                 }
                 OutlinedTextField(name, { name = it }, label = { Text("Display name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(
-                    url, { url = it }, label = { Text("Address") },
+                    url, { url = it }, label = { Text("🏠  Local address") },
                     placeholder = { Text("http://192.168.1.10:${type.defaultPort}") },
-                    supportingText = { Text("IP or domain with port. Include a URL base if you use one, e.g. /sonarr") },
+                    supportingText = { Text("Used on your home network. IP or domain with port, plus URL base if any (e.g. /sonarr)") },
+                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    remote, { remote = it }, label = { Text("🌍  Remote address (optional)") },
+                    placeholder = { Text("https://sonarr.example.com  or  http://100.x.y.z:${type.defaultPort}") },
+                    supportingText = { Text("Used away from home – Tailscale IP, domain or reverse proxy. Arrmada360 switches automatically.") },
                     singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -317,15 +326,24 @@ fun ServiceEditorScreen(
                 }
                 result?.let { (ok, msg) ->
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background((if (ok) Good else Bad).copy(alpha = 0.14f)).padding(12.dp),
-                    ) { Text((if (ok) "✓ Connected: " else "✗ ") + msg, color = if (ok) Good else Bad, style = MaterialTheme.typography.bodySmall) }
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background((if (ok) Good else Bad).copy(alpha = 0.22f)).padding(12.dp),
+                    ) { Text((if (remote.isNotBlank()) "🏠 Local: " else "") + (if (ok) "✓ Connected – " else "✗ ") + msg, color = Color.White, style = MaterialTheme.typography.bodySmall) }
+                }
+                remoteResult?.let { (ok, msg) ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background((if (ok) Good else Bad).copy(alpha = 0.22f)).padding(12.dp),
+                    ) { Text("🌍 Remote: " + (if (ok) "✓ Connected – " else "✗ ") + msg, color = Color.White, style = MaterialTheme.typography.bodySmall) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
                         onClick = {
-                            testing = true; result = null
+                            testing = true; result = null; remoteResult = null
                             scope.launch {
-                                result = try { true to ServiceTester.test(build()) } catch (e: Exception) { false to com.arrmada360.app.net.friendlyError(e) }
+                                val c = build()
+                                result = try { true to ServiceTester.test(c.copy(remoteUrl = "")) } catch (e: Exception) { false to com.arrmada360.app.net.friendlyError(e) }
+                                if (c.remoteUrl.isNotBlank()) {
+                                    remoteResult = try { true to ServiceTester.test(c.copy(url = c.remoteUrl, remoteUrl = "")) } catch (e: Exception) { false to com.arrmada360.app.net.friendlyError(e) }
+                                }
                                 testing = false
                             }
                         },

@@ -336,7 +336,7 @@ class QbitClient(override val cfg: ServiceConfig) : DownloadClient, RssClient {
 class TransmissionClient(override val cfg: ServiceConfig) : DownloadClient {
     private val client = Http.client(cfg.trustAllCerts)
     private var sid = ""
-    private val rpcUrl = cfg.baseUrl.let { if (it.endsWith("/rpc")) it else "$it/transmission/rpc" }
+    private val rpcUrl get() = cfg.baseUrl.let { if (it.endsWith("/rpc")) it else "$it/transmission/rpc" }
 
     private suspend fun rpc(method: String, args: JSONObject = JSONObject()): JSONObject = withContext(Dispatchers.IO) {
         val body = JSONObject().put("method", method).put("arguments", args).toString()
@@ -398,7 +398,7 @@ class DelugeClient(override val cfg: ServiceConfig) : DownloadClient {
     private val client = Http.client(cfg.trustAllCerts).newBuilder().cookieJar(jar).build()
     private var reqId = 1
     private var loggedIn = false
-    private val url = cfg.baseUrl.let { if (it.endsWith("/json")) it else "$it/json" }
+    private val url get() = cfg.baseUrl.let { if (it.endsWith("/json")) it else "$it/json" }
 
     private suspend fun raw(method: String, params: JSONArray): JSONObject {
         val body = JSONObject().put("method", method).put("params", params).put("id", reqId++).toString()

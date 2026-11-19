@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         ConfigStore.init(applicationContext)
+        com.arrmada360.app.net.NetSwitch.start(applicationContext)
         installCrashLogger()
         Coil.setImageLoader(
             ImageLoader.Builder(applicationContext)

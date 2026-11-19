@@ -88,6 +88,7 @@ sealed interface Route {
     data object SettingsAppearance : Route
     data object SettingsDiscovery : Route
     data object Updates : Route
+    data object SettingsConnection : Route
     data object Changelog : Route
 }
 
@@ -119,7 +120,7 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
     }
 
     val current = nav.current
-    androidx.compose.runtime.LaunchedEffect(ConfigStore.services.size) { Connections.checkAll() }
+    androidx.compose.runtime.LaunchedEffect(ConfigStore.services.size, com.arrmada360.app.net.NetSwitch.version) { Connections.checkAll() }
     // Volume rocker: cycle through apps
     androidx.compose.runtime.LaunchedEffect(Unit) {
         com.arrmada360.app.data.AppEvents.cycleService.collect { d ->
@@ -190,6 +191,7 @@ private fun RouteContent(r: Route, nav: Navigator) {
         Route.SettingsNotifications -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.NotificationsScreen(nav, back) }
         Route.SettingsDeepLinks -> com.arrmada360.app.ui.screens.DeepLinksScreen(back)
         Route.Updates -> com.arrmada360.app.ui.screens.UpdatesScreen(nav, back)
+        Route.SettingsConnection -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.ConnectionSwitchScreen(back) }
         Route.Changelog -> com.arrmada360.app.ui.screens.ChangelogScreen(back)
         Route.SettingsAppearance -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.AppearanceScreen(back) }
         Route.SettingsDiscovery -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.DiscoverySettingsScreen(back) }
@@ -254,6 +256,10 @@ private fun DrawerContent(current: Route, go: (Route) -> Unit) {
                         Text("Arrmada360", style = MaterialTheme.typography.headlineSmall, color = Color.White)
                         val online = ConfigStore.services.count { Connections.of(it.id) is Conn.Ok }
                         Text("${ConfigStore.services.size} apps · $online online", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f))
+                        if (ConfigStore.services.any { it.hasRemote }) {
+                            val home = ConfigStore.services.filter { it.hasRemote }.all { com.arrmada360.app.net.NetSwitch.useLocal(it) }
+                            Text(if (home) "🏠 Local connection" else "🌍 Remote connection", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

@@ -84,6 +84,7 @@ object Notifier {
 class NotifyWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
         ConfigStore.init(applicationContext)
+        com.arrmada360.app.net.NetSwitch.start(applicationContext)
         if (!ConfigStore.flag(Pref.NOTIFY)) return Result.success()
         ConfigStore.services.toList().forEach { c ->
             try { check(c) } catch (e: Exception) { /* server offline – try again next time */ }

@@ -308,7 +308,21 @@ arrmada360://service/<app name>     e.g. arrmada360://service/Sonarr
 
 ## Remote access
 
-Arrmada360 connects straight to the addresses you enter, so anything that works in your phone's browser works in the app:
+Each app can have **two addresses**:
+- **🏠 Local**, e.g. `http://192.168.1.10:8989`
+- **🌍 Remote**, e.g. a Tailscale IP or `https://sonarr.example.com`
+
+Arrmada360 switches between them automatically, like nzb360. Configure it in **Settings → Connection switching**:
+
+| Mode | Behaviour |
+|---|---|
+| **Automatic** (default) | Local on your saved **home Wi-Fi networks**, remote anywhere else. With no home networks saved, the app quickly tests each local address on Wi-Fi and uses it if it answers |
+| **Always local** | Useful if your VPN (e.g. Tailscale subnet routing) makes LAN addresses work everywhere |
+| **Always remote** | Always use the remote address when one is set |
+
+Reading the Wi-Fi name needs Android's location permission. The app asks only when you tap *Add current Wi-Fi network*.
+
+Any address that works in your phone's browser works in the app:
 
 - **On your home network:** `http://192.168.x.x:port`
 - **Tailscale or another VPN:** use the Tailscale IP or MagicDNS name, e.g. `http://tower:8989`
