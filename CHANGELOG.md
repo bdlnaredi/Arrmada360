@@ -8,7 +8,7 @@ Builds #2, #5, #10, #15, #18 and #19 failed to compile in CI and were fixed stra
 
 ---
 
-## [Unreleased] – next build
+## [1.0.21] – 2026-11-19
 
 ### Fixed
 - **Upcoming shows** on the TV Shows tab were empty. The TMDB list used each show's *first* air date, so everything looked old and was filtered out, and the empty result never fell back to another source. Each source is now filtered on its own, TV uses TMDB's "premiering from today" search, Trakt includes new seasons, and Seerr falls back to a date-filtered discover list.
