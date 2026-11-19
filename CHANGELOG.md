@@ -8,7 +8,7 @@ Builds #2, #5 and #10 failed to compile in CI and were fixed straight away in bu
 
 ---
 
-## [Unreleased] – next build
+## [1.0.14] – 2026-11-19
 
 ### Added
 - **RSS multi-select**: long-press an article or tap the checklist button. Then select all, download all, mark read, or download them all into a category.
