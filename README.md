@@ -243,8 +243,8 @@ The dashboard opens from **Dashboard** in the side menu and has four bottom tabs
 
 | Tab | What it shows |
 |---|---|
-| **Movies** | Trending (large picture cards), Recently downloaded, Recommended for you, Most anticipated, Upcoming, Popular, Popular people, and a link to your full Radarr library |
-| **TV Shows** | The same rows for shows, using Sonarr |
+| **Movies** | Trending (large picture cards), Recently downloaded, **Upcoming** (movies from your Radarr library), Recommended for you, **Releasing soon** (new releases from Trakt, TMDB or Seerr), Most anticipated, Popular, Popular people, and a link to your full Radarr library |
+| **TV Shows** | The same rows for shows. **Upcoming episodes** lists monitored episodes from your Sonarr library |
 | **Calendar** | Everything coming up from all your media apps, grouped by day, with each app's logo and a filter |
 | **Server** | **Server Info**: disk space, 2-week download history chart, *arr health issues. Then your **Unraid** summary, **live downloads**, **Other Services** (recently downloaded books and albums), **External Server Use** (Tautulli streams, Seerr pending requests) and an online/offline tile for every app |
 

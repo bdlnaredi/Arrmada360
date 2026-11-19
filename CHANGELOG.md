@@ -8,6 +8,14 @@ Builds #2, #5, #10, #15, #18 and #19 failed to compile in CI and were fixed stra
 
 ---
 
+## [1.0.22] – 2026-11-19
+
+### Changed
+- **Upcoming now comes from your library.**
+  - **Movies tab → Upcoming movies:** monitored Radarr movies releasing in the next 90 days.
+  - **TV Shows tab → Upcoming episodes:** monitored Sonarr episodes airing in the next 90 days, each with show poster, episode number and date. Tap one to open the show.
+- **New "Releasing soon" row:** new movies and shows coming out soon from Trakt, TMDB or Seerr (what the Upcoming row used to show).
+
 ## [1.0.21] – 2026-11-19
 
 ### Fixed

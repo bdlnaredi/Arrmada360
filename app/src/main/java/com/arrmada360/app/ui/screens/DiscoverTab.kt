@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TrendingUp
@@ -107,6 +108,10 @@ fun DiscoverTab(isMovie: Boolean, arr: ServiceConfig?, nav: Navigator) {
             items,
         )
     }
+    // Upcoming = what's coming in *your* library (Radarr movies / Sonarr episodes)
+    val libUpcoming = rememberLoadable(arr, "discover-libup") {
+        api?.calendar(0, 90)?.filter { !it.hasFile && (parseDate(it.date)?.let { d -> !d.isBefore(java.time.LocalDate.now()) } ?: true) }?.take(40) ?: emptyList()
+    }
     val recent = rememberLoadable(arr, "discover-recent") {
         when {
             api == null -> emptyList()
@@ -137,9 +142,15 @@ fun DiscoverTab(isMovie: Boolean, arr: ServiceConfig?, nav: Navigator) {
         if (arr != null) item(key = "recent") {
             EntryRow("Recently downloaded", Icons.Filled.DownloadDone, Good, recent, arr) { e -> nav.push(Route.ArrDetail(arr.id, e.parentId)) }
         }
+        if (arr != null) item(key = "libup") {
+            EntryRow(if (isMovie) "Upcoming movies" else "Upcoming episodes", Icons.Filled.CalendarMonth, Warn, libUpcoming, arr, datePrefix = "📅 ",
+                emptyHint = if (isMovie) "No monitored movies releasing in the next 90 days" else "No monitored episodes airing in the next 90 days") { e ->
+                nav.push(Route.ArrDetail(arr.id, e.parentId))
+            }
+        }
         item(key = "rec") { ItemRow("Recommended for you", Icons.Filled.AutoAwesome, Accent2, recommended, lib.data, hideIfEmpty = true) { openItem = it } }
+        item(key = "soon") { ItemRow("Releasing soon", Icons.Filled.NewReleases, Rainbow[0], upcoming, lib.data, showDate = true) { openItem = it } }
         item(key = "ant") { ItemRow("Most anticipated", Icons.Filled.Whatshot, Pink, anticipated, lib.data) { openItem = it } }
-        item(key = "up") { ItemRow(if (isMovie) "Upcoming movies" else "Upcoming shows", Icons.Filled.CalendarMonth, Warn, upcoming, lib.data, showDate = true) { openItem = it } }
         item(key = "pop") { ItemRow(if (isMovie) "Popular movies" else "Popular shows", Icons.Filled.LocalFireDepartment, Rainbow[5], popular, lib.data) { openItem = it } }
         item(key = "people") { PeopleRow(people) { openPerson = it } }
         if (arr != null) item(key = "lib") {
@@ -264,19 +275,34 @@ private fun PosterCard(i: DiscoverItem, color: Color, inLib: Boolean, showDate: 
 }
 
 @Composable
-private fun EntryRow(title: String, icon: ImageVector, color: Color, l: Loadable<List<CalEntry>>, arr: ServiceConfig, onClick: (CalEntry) -> Unit) {
+private fun EntryRow(
+    title: String,
+    icon: ImageVector,
+    color: Color,
+    l: Loadable<List<CalEntry>>,
+    arr: ServiceConfig,
+    datePrefix: String = "⬇ ",
+    emptyHint: String? = null,
+    onClick: (CalEntry) -> Unit,
+) {
     val d = l.data
-    if (d != null && d.isEmpty()) return
+    if (d != null && d.isEmpty()) {
+        if (emptyHint != null) {
+            RowHeader(title, icon, color, arr.name)
+            Text(emptyHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
+        }
+        return
+    }
     RowHeader(title, icon, color, arr.name)
     if (d == null) { ShimmerRow(); return }
     LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(d, key = { "r" + it.id }) { e ->
+        items(d, key = { "r" + it.id + it.date }) { e ->
             Column(Modifier.width(120.dp).clickable { onClick(e) }) {
                 Box(Modifier.clip(RoundedCornerShape(12.dp)).border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(12.dp))) {
                     Poster(e.poster, Modifier.fillMaxWidth(), corner = 12.dp, fallback = e.title)
                     Box(Modifier.align(Alignment.TopEnd).padding(5.dp)) { ServiceBadge(arr.type, 22.dp, arr.name) }
                     if (e.date.isNotEmpty()) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)))).padding(6.dp)) {
-                        Text("⬇ " + relativeDay(parseDate(e.date)), style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(datePrefix + relativeDay(parseDate(e.date)), style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
                 Spacer(Modifier.height(5.dp))
