@@ -113,7 +113,12 @@ class Navigator {
 
 @Composable
 fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
-    val nav = remember { Navigator() }
+    val nav = remember {
+        Navigator().also { n ->
+            val sid = ConfigStore.getString("startupService")
+            if (sid.isNotEmpty() && ConfigStore.get(sid) != null) n.root(Route.Service(sid))
+        }
+    }
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 

@@ -71,6 +71,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.RocketLaunch
+import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.Feedback
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.NewReleases
+import com.arrmada360.app.ui.rememberLoadable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -218,56 +227,245 @@ fun SettingsGate(back: () -> Unit, content: @Composable () -> Unit) {
     }
 }
 
-// ============================================================ main settings
+// ============================================================ main settings (nzb360-like layout, Arrmada360 style)
+@Composable
+private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier.padding(horizontal = 14.dp).fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)),
+        content = content,
+    )
+}
+
+@Composable
+private fun GroupTitle(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    Text(text.uppercase(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = color,
+        modifier = Modifier.padding(start = 22.dp, top = 26.dp, bottom = 10.dp))
+}
+
+/** App tile in the 2-column grid: logo, name, chevron. */
+@Composable
+private fun AppGridTile(c: ServiceConfig, modifier: Modifier, onClick: () -> Unit, onLong: () -> Unit) {
+    val failing = Connections.of(c.id) is com.arrmada360.app.api.Conn.Fail
+    Row(
+        modifier.height(66.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.background.copy(alpha = 0.55f))
+            .combinedClickable(onClick = onClick, onLongClick = onLong).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+            com.arrmada360.app.ui.ServiceLogo(c.type, 30.dp, c.name)
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(c.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1,
+            overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        if (failing) Box(Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Bad))
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+    }
+}
+
+/** Dashed "add" tile. */
+@Composable
+private fun AddTile(label: String, modifier: Modifier, onClick: () -> Unit) {
+    val c = Good
+    Row(
+        modifier.height(66.dp).clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick)
+            .drawBehind {
+                drawRoundRect(
+                    c.copy(alpha = 0.7f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(20.dp.toPx()),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = 1.5.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(14f, 10f)),
+                    ),
+                )
+            }.padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.Add, null, tint = c)
+        Spacer(Modifier.width(12.dp))
+        Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = c, maxLines = 1)
+    }
+}
+
+@Composable
+private fun TileGrid(apps: List<ServiceConfig>, addLabel: String, onOpen: (ServiceConfig) -> Unit, onLong: (ServiceConfig) -> Unit, onAdd: () -> Unit) {
+    val cells: List<ServiceConfig?> = apps + listOf(null)
+    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        cells.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { c ->
+                    if (c == null) AddTile(addLabel, Modifier.weight(1f), onAdd)
+                    else AppGridTile(c, Modifier.weight(1f), { onOpen(c) }, { onLong(c) })
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
 @Composable
 fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
     val ctx = LocalContext.current
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
     var manage by remember { mutableStateOf<ServiceConfig?>(null) }
-    val (ver, _) = appVersion(ctx)
-    SettingsPage("Settings", back, isRoot) {
-        item {
-            Row(
-                Modifier.padding(14.dp).fillMaxWidth().clip(RoundedCornerShape(24.dp))
-                    .background(Brush.linearGradient(listOf(Accent.copy(alpha = 0.45f), Accent2.copy(alpha = 0.40f), Pink.copy(alpha = 0.25f)))).padding(18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(painterResource(R.drawable.ic_launcher_foreground), null, tint = Color.Unspecified, modifier = Modifier.size(64.dp))
-                Spacer(Modifier.width(10.dp))
-                Column {
-                    Text("Arrmada360", style = MaterialTheme.typography.headlineSmall, color = Color.White)
-                    Text("Version $ver · every feature free", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f))
+    var startupPick by remember { mutableStateOf(false) }
+    var crashText by remember { mutableStateOf<String?>(null) }
+    val (ver, build) = appVersion(ctx)
+    val latest = rememberLoadable("settings-latest") { try { com.arrmada360.app.api.Updates.latest() } catch (e: Exception) { null } }
+    val updateReady = (latest.data?.build ?: 0) > build
+    val apps = ConfigStore.services.filter { !it.type.isIndexer }
+    val indexers = ConfigStore.services.filter { it.type.isIndexer }
+    val online = ConfigStore.services.count { Connections.of(it.id) is com.arrmada360.app.api.Conn.Ok }
+    val startupId = ConfigStore.getString("startupService")
+    val startupName = ConfigStore.get(startupId)?.name ?: "Dashboard"
+
+    AppScaffold(
+        title = "", isRoot = isRoot, onBack = back,
+        titleContent = {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(end = 12.dp)) {
+                Text("Settings", style = MaterialTheme.typography.headlineMedium, color = Color.White, modifier = Modifier.weight(1f))
+                Row(
+                    Modifier.clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { nav.push(if (updateReady) Route.Updates else Route.Changelog) }
+                        .padding(start = 8.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box {
+                        Icon(painterResource(R.drawable.ic_launcher_foreground), null, tint = Color.Unspecified, modifier = Modifier.size(36.dp))
+                        if (updateReady) Box(Modifier.align(Alignment.TopEnd).size(10.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Pink))
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Column {
+                        Text(if (updateReady) "Update ready" else "What's New", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("v$ver", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Accent)
+                    }
+                }
+            }
+        },
+    ) { pad ->
+        LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(bottom = 40.dp)) {
+            item {
+                GroupTitle("App settings")
+                SettingsCard {
+                    SettingLink(Icons.Filled.Tune, "General", tint = MaterialTheme.colorScheme.onSurface) { nav.push(Route.SettingsGeneral) }
+                    SettingLink(Icons.Filled.Notifications, "Notifications", if (ConfigStore.flag(Pref.NOTIFY)) "On" else null, tint = MaterialTheme.colorScheme.onSurface) { nav.push(Route.SettingsNotifications) }
+                    SettingLink(Icons.Filled.CloudUpload, "Backup & restore", tint = MaterialTheme.colorScheme.onSurface) { nav.push(Route.SettingsBackup) }
+                    SettingLink(Icons.Filled.Palette, "Appearance", tint = MaterialTheme.colorScheme.onSurface) { nav.push(Route.SettingsAppearance) }
+                    SettingLink(Icons.Filled.Explore, "Discovery sources", "Trakt, TMDB and Seerr", tint = MaterialTheme.colorScheme.onSurface) { nav.push(Route.SettingsDiscovery) }
+                    SettingLink(Icons.Filled.SystemUpdate, "Updates", if (updateReady) "Build #${latest.data?.build} is ready to install" else "Build #$build · up to date", tint = MaterialTheme.colorScheme.onSurface, divider = false) { nav.push(Route.Updates) }
+                }
+            }
+            item {
+                GroupTitle("Your server", Good)
+                Column(
+                    Modifier.padding(horizontal = 14.dp).fillMaxWidth().clip(RoundedCornerShape(26.dp))
+                        .background(Brush.linearGradient(listOf(Good.copy(alpha = 0.22f), MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)))),
+                ) {
+                    Row(Modifier.padding(start = 22.dp, end = 18.dp, top = 20.dp, bottom = 12.dp), verticalAlignment = Alignment.Bottom) {
+                        Text("$online", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Black, color = Color.White)
+                        Text(" / ${ConfigStore.services.size} apps online", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp).weight(1f))
+                        Row(
+                            Modifier.clip(RoundedCornerShape(50)).background(Good.copy(alpha = 0.85f)).clickable { nav.push(Route.Health) }.padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) { Icon(Icons.Filled.Wifi, null, tint = Color.White, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Test", color = Color.White, fontWeight = FontWeight.Bold) }
+                    }
+                    Text("Every feature is free – no credits, no subscriptions.", style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 22.dp, bottom = 12.dp))
+                    GroupDivider()
+                    SettingLink(Icons.Filled.Wifi, "Connection check", "Test every app and fix what's offline", tint = Good) { nav.push(Route.Health) }
+                    SettingLink(Icons.Filled.Sync, "Connection switching", com.arrmada360.app.net.NetSwitch.describe(), tint = Accent, divider = false) { nav.push(Route.SettingsConnection) }
+                }
+            }
+            item {
+                GroupTitle("Services")
+                SettingsCard {
+                    Row(Modifier.fillMaxWidth().clickable { startupPick = true }.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        RowIcon(Icons.Filled.RocketLaunch, Good)
+                        Spacer(Modifier.width(16.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("STARTUP SCREEN", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+                            Text(startupName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    GroupDivider()
+                    TileGrid(apps, "Add a service", onOpen = { nav.push(Route.EditService(it.id, null)) }, onLong = { manage = it }, onAdd = { nav.push(Route.AddService) })
+                }
+                Text("Tap an app to edit it, long-press to reorder or remove.", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 22.dp, top = 8.dp))
+            }
+            item {
+                GroupTitle("Indexers")
+                SettingsCard {
+                    TileGrid(indexers, "Add an indexer", onOpen = { nav.push(Route.EditService(it.id, null)) }, onLong = { manage = it },
+                        onAdd = { nav.push(Route.EditService(null, com.arrmada360.app.data.ServiceType.PROWLARR)) })
+                }
+            }
+            item {
+                GroupTitle("Help")
+                SettingsCard {
+                    SettingLink(Icons.Filled.HelpOutline, "Help center", "Setup guide, API keys, troubleshooting", tint = MaterialTheme.colorScheme.onSurface) {
+                        uri.openUri("https://github.com/${com.arrmada360.app.api.Updates.REPO}#readme")
+                    }
+                    SettingLink(Icons.Filled.Article, "Logging center", "Last crash log on this phone", tint = MaterialTheme.colorScheme.onSurface) {
+                        val f = File(ctx.filesDir, "crash.txt"); crashText = if (f.exists()) f.readText() else ""
+                    }
+                    SettingLink(Icons.Filled.Feedback, "Send feedback", "Report a bug or ask for a feature on GitHub", tint = MaterialTheme.colorScheme.onSurface, divider = false) {
+                        uri.openUri("https://github.com/${com.arrmada360.app.api.Updates.REPO}/issues/new")
+                    }
+                }
+            }
+            item {
+                Row(Modifier.fillMaxWidth().padding(top = 24.dp), horizontalArrangement = Arrangement.Center) {
+                    Row(
+                        Modifier.clip(RoundedCornerShape(50)).background(Color(0xFF24292F)).clickable { uri.openUri("https://github.com/${com.arrmada360.app.api.Updates.REPO}") }
+                            .padding(horizontal = 22.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) { Icon(Icons.Filled.Code, null, tint = Color.White); Spacer(Modifier.width(8.dp)); Text("GitHub", color = Color.White, fontWeight = FontWeight.Bold) }
+                    Spacer(Modifier.width(12.dp))
+                    Row(
+                        Modifier.clip(RoundedCornerShape(50)).background(Accent2.copy(alpha = 0.85f)).clickable { nav.push(Route.Changelog) }
+                            .padding(horizontal = 22.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) { Icon(Icons.Filled.NewReleases, null, tint = Color.White); Spacer(Modifier.width(8.dp)); Text("Changelog", color = Color.White, fontWeight = FontWeight.Bold) }
+                }
+                Text("Privacy: nothing leaves your phone except to your own servers →", style = MaterialTheme.typography.labelLarge, color = Good, fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 18.dp)
+                        .clickable { uri.openUri("https://github.com/${com.arrmada360.app.api.Updates.REPO}#privacy") })
+                TextButton(onClick = { ConfigStore.resetOnboarding() }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Text("Run first-time setup again", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
-        item {
-            SettingsGroup("Your apps") {
-                ConfigStore.services.forEach { c ->
-                    SettingLink(null, c.name, c.baseUrl, tint = c.type.tint, leading = { ServiceBadge(c.type, 44.dp, c.name) },
-                        onLongClick = { manage = c }) { nav.push(Route.EditService(c.id, null)) }
+    }
+
+    if (startupPick) AlertDialog(
+        onDismissRequest = { startupPick = false },
+        title = { Text("Open on startup") },
+        text = {
+            Column(Modifier.heightIn(max = 420.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                (listOf<ServiceConfig?>(null) + ConfigStore.services).forEach { c ->
+                    Row(Modifier.fillMaxWidth().clickable { ConfigStore.putString("startupService", c?.id ?: ""); startupPick = false }.padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(startupId == (c?.id ?: ""), { ConfigStore.putString("startupService", c?.id ?: ""); startupPick = false })
+                        if (c != null) { com.arrmada360.app.ui.ServiceLogo(c.type, 26.dp, c.name); Spacer(Modifier.width(10.dp)) }
+                        Text(c?.name ?: "Dashboard")
+                    }
                 }
-                SettingLink(Icons.Filled.Add, "Add an app", "Sonarr, Radarr, Prowlarr, qBittorrent, Unraid…", tint = Accent) { nav.push(Route.AddService) }
-                SettingLink(Icons.Filled.Wifi, "Test all connections", "See which apps are online and fix any that aren't", tint = Good, divider = false) { nav.push(Route.Health) }
             }
-            Text("Tip: long-press an app to reorder or remove it.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 20.dp, top = 6.dp))
-        }
-        item {
-            SettingsGroup("Settings") {
-                SettingLink(Icons.Filled.Tune, "General settings", "Navigation, interface, IMDb links, security", tint = Rainbow[0]) { nav.push(Route.SettingsGeneral) }
-                SettingLink(Icons.Filled.Wifi, "Connection check", "Test every app and see what's online", tint = Good) { nav.push(Route.Health) }
-                SettingLink(Icons.Filled.Sync, "Connection switching", com.arrmada360.app.net.NetSwitch.describe(), tint = Accent) { nav.push(Route.SettingsConnection) }
-                SettingLink(Icons.Filled.Notifications, "Notifications", if (ConfigStore.flag(Pref.NOTIFY)) "On – checking your servers in the background" else "Off", tint = Rainbow[3]) { nav.push(Route.SettingsNotifications) }
-                SettingLink(Icons.Filled.Inventory2, "Backup & restore", "Save everything to a .zip or move to a new phone", tint = Good) { nav.push(Route.SettingsBackup) }
-                SettingLink(Icons.Filled.Palette, "Appearance", if (ConfigStore.amoled) "AMOLED black · ${ConfigStore.gridColumns} poster columns" else "Dark · ${ConfigStore.gridColumns} poster columns", tint = Rainbow[2]) { nav.push(Route.SettingsAppearance) }
-                SettingLink(Icons.Filled.Explore, "Discovery sources", "Trakt, TMDB and Seerr for the Movies & TV tabs", tint = Accent2) { nav.push(Route.SettingsDiscovery) }
-                SettingLink(Icons.Filled.SystemUpdate, "Updates & changelog", "Version $ver – check for a new build, see what's changed", tint = Accent, divider = false) { nav.push(Route.Updates) }
-            }
-        }
-        item {
-            Text("Arrmada360 is free and open source. No subscriptions, no paywalls, nothing sent anywhere except to your own servers and the discovery sources you choose.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(20.dp))
-            TextButton(onClick = { ConfigStore.resetOnboarding() }, modifier = Modifier.padding(horizontal = 8.dp)) { Text("Run first-time setup again") }
-        }
+        },
+        confirmButton = { TextButton(onClick = { startupPick = false }) { Text("Close") } },
+    )
+
+    crashText?.let { t ->
+        AlertDialog(
+            onDismissRequest = { crashText = null },
+            title = { Text("Logging center") },
+            text = { Text(t.ifEmpty { "No crashes recorded 🎉" }.take(3000), style = MaterialTheme.typography.labelSmall) },
+            confirmButton = {
+                if (t.isNotEmpty()) TextButton(onClick = {
+                    ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, t), "Share crash log"))
+                }) { Text("Share") }
+            },
+            dismissButton = { TextButton(onClick = { crashText = null }) { Text("Close") } },
+        )
     }
 
     manage?.let { c ->
@@ -280,7 +478,7 @@ fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
                     TextButton(onClick = { ConfigStore.move(c.id, -1) }) { Text("Move up") }
                     TextButton(onClick = { ConfigStore.move(c.id, 1) }) { Text("Move down") }
                     TextButton(onClick = { manage = null; nav.push(Route.EditService(c.id, null)) }) { Text("Edit") }
-                    TextButton(onClick = { confirm = true }) { Text(if (confirm) "Tap again to remove" else "Remove from Arrmada360", color = Bad) }
+                    TextButton(onClick = { confirm = true }) { Text("Remove from Arrmada360", color = Bad) }
                     if (confirm) TextButton(onClick = { ConfigStore.remove(c.id); manage = null }) { Text("Yes, remove ${c.name}", color = Bad, fontWeight = FontWeight.Bold) }
                 }
             },

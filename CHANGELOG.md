@@ -11,6 +11,16 @@ Builds #2, #5, #10, #15, #18 and #19 failed to compile in CI and were fixed stra
 ## [Unreleased] – next build
 
 ### Changed
+- **New Settings home**, laid out like nzb360's but in Arrmada360's style:
+  - Large title with a **What's New** pill (version, and a dot when an update is ready).
+  - **App settings** card: General, Notifications, Backup & restore, Appearance, Discovery sources, Updates.
+  - **Your server** card: apps online with a *Test* button, Connection check and Connection switching.
+  - **Services**: a **startup screen** picker, then a two-column grid of your apps with a dashed **Add a service** tile. Tap to edit, long-press to reorder or remove.
+  - **Indexers** grid with **Add an indexer**.
+  - **Help**: help center (README), logging center (crash log), send feedback (GitHub issues), plus GitHub, Changelog and privacy links.
+
+### Added
+- **Startup screen**: choose whether the app opens on the Dashboard or straight into any app.
 - **Cleaner side menu**:
   - Logo and wordmark at the top, with a thin rule and an edit button that opens your apps in Settings.
   - One flat list: Dashboard, then each app with its own logo. No category headers, tiles or status dots.
