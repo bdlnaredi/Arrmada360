@@ -8,7 +8,7 @@ Builds #2, #5, #10, #15, #18 and #19 failed to compile in CI and were fixed stra
 
 ---
 
-## [Unreleased] – next build
+## [1.0.23] – 2026-11-19
 
 ### Fixed
 - **Namer search returned no results.** The app was "cleaning" the file name (dots to spaces, quality tags removed) before sending it to Namer, which breaks ThePornDB's file-name parsing.
