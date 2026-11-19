@@ -38,6 +38,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Inbox
@@ -219,6 +221,9 @@ fun AppScaffold(
     tabs: List<String> = emptyList(),
     selectedTab: Int = 0,
     onTab: (Int) -> Unit = {},
+    bottomTabs: List<BottomTab> = emptyList(),
+    selectedBottom: Int = 0,
+    onBottom: (Int) -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val openDrawer = LocalOpenDrawer.current
@@ -252,11 +257,73 @@ fun AppScaffold(
                     if (tabs.isNotEmpty()) PillTabs(tabs, selectedTab, onTab)
                 }
             },
+            bottomBar = { if (bottomTabs.isNotEmpty()) BottomTabs(bottomTabs, selectedBottom, onBottom) },
             floatingActionButton = fab,
             containerColor = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onBackground,
             content = content,
         )
+    }
+}
+
+/** A tappable settings-style row with a coloured icon and an arrow, used on every Server tab. */
+@Composable
+fun MenuRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String? = null,
+    tint: Color = MaterialTheme.colorScheme.primary,
+    external: Boolean = false,
+    arrow: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Panel(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), tint = tint, onClick = onClick) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                    .background(Brush.linearGradient(listOf(tint.copy(alpha = 0.40f), tint.copy(alpha = 0.15f)))),
+                contentAlignment = Alignment.Center,
+            ) { Icon(icon, null, tint = Color.White, modifier = Modifier.size(22.dp)) }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                if (!subtitle.isNullOrEmpty()) Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            }
+            if (arrow) Icon(
+                if (external) androidx.compose.material.icons.Icons.AutoMirrored.Filled.OpenInNew else androidx.compose.material.icons.Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                null, tint = tint,
+            )
+        }
+    }
+}
+
+data class BottomTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+
+/** Colourful bottom navigation bar, like nzb360's per-app tabs. */
+@Composable
+fun BottomTabs(tabs: List<BottomTab>, selected: Int, onSelect: (Int) -> Unit) {
+    val p = MaterialTheme.colorScheme.primary
+    val s = MaterialTheme.colorScheme.secondary
+    Column {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Brush.horizontalGradient(listOf(Color.Transparent, p.copy(alpha = 0.6f), s.copy(alpha = 0.6f), Color.Transparent))))
+        androidx.compose.material3.NavigationBar(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f), tonalElevation = 0.dp) {
+            tabs.forEachIndexed { i, t ->
+                val on = i == selected
+                androidx.compose.material3.NavigationBarItem(
+                    selected = on,
+                    onClick = { onSelect(i) },
+                    icon = { Icon(t.icon, t.label) },
+                    label = { Text(t.label, maxLines = 1, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, style = MaterialTheme.typography.labelSmall) },
+                    colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color(0xFF0B0D10),
+                        selectedTextColor = p,
+                        indicatorColor = p,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                )
+            }
+        }
     }
 }
 

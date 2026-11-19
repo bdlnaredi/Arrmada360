@@ -75,6 +75,8 @@ sealed interface Route {
     data class EditService(val id: String?, val type: ServiceType?) : Route
     data class Search(val term: String = "") : Route
     data object Health : Route
+    data class ArrSystem(val serviceId: String) : Route
+    data class ManualImport(val serviceId: String) : Route
 }
 
 class Navigator {
@@ -151,6 +153,12 @@ private fun RouteContent(r: Route, nav: Navigator) {
         is Route.ArrDetail -> ConfigStore.get(r.serviceId)?.let { cfg ->
             ServiceTheme(cfg.type, ConfigStore.amoled) { ArrDetailScreen(cfg, r.itemId, nav, back) }
         } ?: EmptyBox("Service missing")
+        is Route.ArrSystem -> ConfigStore.get(r.serviceId)?.let { cfg ->
+            ServiceTheme(cfg.type, ConfigStore.amoled) { com.arrmada360.app.ui.screens.ArrSystemScreen(cfg, back) }
+        } ?: EmptyBox("Service missing")
+        is Route.ManualImport -> ConfigStore.get(r.serviceId)?.let { cfg ->
+            ServiceTheme(cfg.type, ConfigStore.amoled) { com.arrmada360.app.ui.screens.ManualImportScreen(cfg, back) }
+        } ?: EmptyBox("Service missing")
         is Route.ArrAdd -> ConfigStore.get(r.serviceId)?.let { cfg ->
             ServiceTheme(cfg.type, ConfigStore.amoled) { ArrAddScreen(cfg, r.term, nav, back) }
         } ?: EmptyBox("Service missing")
@@ -161,11 +169,11 @@ private fun RouteContent(r: Route, nav: Navigator) {
 private fun ServiceRoot(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () -> Unit) {
     when {
         cfg.type.isArr -> ArrScreen(cfg, nav, isRoot, back)
-        cfg.type.isDownloader -> DownloadsScreen(cfg, isRoot, back)
-        cfg.type.isIndexer -> IndexerScreen(cfg, isRoot, back)
-        cfg.type == ServiceType.SEERR -> SeerrScreen(cfg, isRoot, back)
-        cfg.type == ServiceType.TAUTULLI -> TautulliScreen(cfg, isRoot, back)
-        cfg.type == ServiceType.UNRAID -> UnraidScreen(cfg, isRoot, back)
+        cfg.type.isDownloader -> DownloadsScreen(cfg, nav, isRoot, back)
+        cfg.type.isIndexer -> IndexerScreen(cfg, nav, isRoot, back)
+        cfg.type == ServiceType.SEERR -> SeerrScreen(cfg, nav, isRoot, back)
+        cfg.type == ServiceType.TAUTULLI -> TautulliScreen(cfg, nav, isRoot, back)
+        cfg.type == ServiceType.UNRAID -> UnraidScreen(cfg, nav, isRoot, back)
         else -> EmptyBox("Unsupported")
     }
 }

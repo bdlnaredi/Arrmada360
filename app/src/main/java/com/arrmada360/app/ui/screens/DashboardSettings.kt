@@ -1,6 +1,15 @@
 package com.arrmada360.app.ui.screens
 
 import android.content.Intent
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.arrmada360.app.ui.BottomTab
+import com.arrmada360.app.ui.ServiceTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -108,13 +117,49 @@ import kotlinx.coroutines.coroutineScope
 @Composable
 fun DashboardScreen(nav: Navigator) {
     val services = ConfigStore.services.toList()
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var pick by rememberSaveable { mutableIntStateOf(0) }
+    val radarrs = services.filter { it.type == ServiceType.RADARR }
+    val sonarrs = services.filter { it.type == ServiceType.SONARR }
+    val instances = when (tab) { 1 -> radarrs; 2 -> sonarrs; else -> emptyList() }
     AppScaffold(
-        title = "Arrmada360", subtitle = greeting(), isRoot = true, onBack = {},
+        title = when (tab) { 1 -> "Movies"; 2 -> "TV Shows"; 3 -> "Calendar"; 4 -> "Server"; else -> "Arrmada360" },
+        subtitle = if (tab == 0) greeting() else instances.getOrNull(pick)?.name,
+        isRoot = true, onBack = {},
+        tabs = if (instances.size > 1) instances.map { it.name } else emptyList(), selectedTab = pick, onTab = { pick = it },
+        bottomTabs = listOf(
+            BottomTab("Home", Icons.Filled.Home),
+            BottomTab("Movies", Icons.Filled.Movie),
+            BottomTab("TV Shows", Icons.Filled.Tv),
+            BottomTab("Calendar", Icons.Filled.CalendarMonth),
+            BottomTab("Server", Icons.Filled.Dns),
+        ),
+        selectedBottom = tab, onBottom = { tab = it; pick = 0 },
         actions = {
             IconButton(onClick = { nav.push(Route.Health) }) { Icon(Icons.Filled.Wifi, "Connection check") }
             IconButton(onClick = { nav.push(Route.Search()) }) { Icon(Icons.Filled.Search, "Search everything") }
         },
+        fab = {
+            val target = instances.getOrNull(pick)
+            if (target != null) androidx.compose.material3.FloatingActionButton(
+                onClick = { nav.push(Route.ArrAdd(target.id)) }, containerColor = target.type.tint, shape = androidx.compose.foundation.shape.CircleShape,
+            ) { Icon(Icons.Filled.Add, "Add") }
+        },
     ) { pad ->
+        if (tab != 0) {
+            Box(Modifier.padding(pad)) {
+                when (tab) {
+                    1, 2 -> {
+                        val c = instances.getOrNull(pick.coerceAtMost((instances.size - 1).coerceAtLeast(0)))
+                        if (c == null) com.arrmada360.app.ui.EmptyBox(if (tab == 1) "Add Radarr in Settings to see your movies here" else "Add Sonarr in Settings to see your TV shows here")
+                        else ServiceTheme(c.type, ConfigStore.amoled) { LibraryTab(remember(c) { ArrApi(c) }, nav) }
+                    }
+                    3 -> CombinedCalendar(services.filter { it.type.isArr }, nav)
+                    else -> ServerHome(services, nav)
+                }
+            }
+            return@AppScaffold
+        }
         if (services.isEmpty()) {
             Column(Modifier.padding(pad).padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(Modifier.height(80.dp))
@@ -347,6 +392,86 @@ private fun GlanceCard(c: ServiceConfig, onClick: () -> Unit) {
                 }
                 l.error != null -> Text("Offline – ${l.error}", style = MaterialTheme.typography.bodySmall, color = Warn, maxLines = 2)
                 else -> Box(Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(14.dp)).shimmer())
+            }
+        }
+    }
+}
+
+@Composable
+private fun CombinedCalendar(arrs: List<ServiceConfig>, nav: Navigator) {
+    if (arrs.isEmpty()) { com.arrmada360.app.ui.EmptyBox("Add Sonarr, Radarr, Lidarr or Readarr to fill your calendar"); return }
+    var filter by rememberSaveable { mutableIntStateOf(0) }
+    val l = rememberLoadable(arrs.map { it.id }, "combinedcal") {
+        coroutineScope {
+            arrs.map { c -> async { try { ArrApi(c).calendar(1, 30).map { c to it } } catch (e: Exception) { emptyList<Pair<ServiceConfig, CalEntry>>() } } }
+                .awaitAll().flatten().sortedBy { it.second.date }
+        }
+    }
+    val names = listOf("All") + arrs.map { it.name }
+    Column {
+        com.arrmada360.app.ui.ChipRow(names, filter, { filter = it }, Modifier.padding(vertical = 8.dp))
+        com.arrmada360.app.ui.LoadableContent(l, empty = { it.isEmpty() }, emptyText = "Nothing coming up in the next 30 days") { all ->
+            val list = if (filter == 0) all else all.filter { it.first.id == arrs[filter - 1].id }
+            LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
+                list.groupBy { parseDate(it.second.date) }.forEach { (day, entries) ->
+                    item(key = "d$day") { SectionTitle(relativeDay(day)) }
+                    items(entries, key = { it.first.id + it.second.id + it.second.date }) { (c, e) ->
+                        Panel(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), tint = c.type.tint, onClick = { nav.push(Route.ArrDetail(c.id, e.parentId)) }) {
+                            Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Poster(e.poster, Modifier.width(50.dp), corner = 8.dp, fallback = e.title)
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(e.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Spacer(Modifier.height(3.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Pill(fmtDate(e.date, withTime = e.date.length > 10).ifEmpty { "TBA" }, c.type.tint)
+                                        if (e.hasFile) Pill("✓ Downloaded", Good)
+                                    }
+                                }
+                                ServiceBadge(c.type, 30.dp, c.name)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ServerHome(services: List<ServiceConfig>, nav: Navigator) {
+    val unraids = services.filter { it.type == ServiceType.UNRAID }
+    var view by rememberSaveable { mutableIntStateOf(0) }
+    Column {
+        val tabs = unraids.map { it.name } + "All apps"
+        com.arrmada360.app.ui.PillTabs(tabs, view.coerceAtMost(tabs.size - 1), { view = it })
+        val u = unraids.getOrNull(view)
+        if (u != null) ServiceTheme(u.type, ConfigStore.amoled) { UnraidOverview(remember(u) { com.arrmada360.app.api.UnraidApi(u) }) }
+        else {
+            androidx.compose.runtime.LaunchedEffect(Unit) { Connections.checkAll() }
+            LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
+                items(services, key = { "srv" + it.id }) { c ->
+                    val st = Connections.of(c.id)
+                    Panel(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), tint = c.type.tint, onClick = { nav.root(Route.Service(c.id)) }) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            ServiceBadge(c.type, 40.dp, c.name)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(c.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(
+                                    when (st) { is Conn.Ok -> "${st.info} · ${st.ms} ms"; is Conn.Fail -> st.msg; is Conn.Checking -> "Checking…"; else -> c.baseUrl },
+                                    style = MaterialTheme.typography.labelSmall, color = if (st is Conn.Fail) Bad else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2,
+                                )
+                            }
+                            when (st) {
+                                is Conn.Ok -> PulseDot(Good)
+                                is Conn.Fail -> PulseDot(Bad, pulsing = false)
+                                else -> CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = c.type.tint)
+                            }
+                        }
+                    }
+                }
             }
         }
     }

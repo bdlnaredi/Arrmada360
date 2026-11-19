@@ -25,6 +25,16 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.ViewInAr
+import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
@@ -63,6 +73,7 @@ import com.arrmada360.app.api.UnraidArray
 import com.arrmada360.app.api.UnraidSystem
 import com.arrmada360.app.data.ServiceConfig
 import com.arrmada360.app.ui.AppScaffold
+import com.arrmada360.app.ui.BottomTab
 import com.arrmada360.app.ui.Bad
 import com.arrmada360.app.ui.ChipRow
 import com.arrmada360.app.ui.EmptyBox
@@ -86,13 +97,21 @@ import com.arrmada360.app.ui.rememberRunner
 private val REQ_FILTERS = listOf("Pending" to "pending", "Approved" to "approved", "Processing" to "processing", "Available" to "available", "All" to "all")
 
 @Composable
-fun SeerrScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
+fun SeerrScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, isRoot: Boolean, back: () -> Unit) {
     val api = remember(cfg) { SeerrApi(cfg) }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
     AppScaffold(title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
-        tabs = listOf("Requests", "Discover"), selectedTab = tab, onTab = { tab = it }) { pad ->
+        bottomTabs = listOf(
+            BottomTab("Requests", Icons.Filled.Inbox), BottomTab("Discover", Icons.Filled.Explore),
+            BottomTab("Users", Icons.Filled.People), BottomTab("Server", Icons.Filled.Dns),
+        ), selectedBottom = tab, onBottom = { tab = it }) { pad ->
         Box(Modifier.padding(pad)) {
-            if (tab == 0) RequestsTab(api) else DiscoverTab(api)
+            when (tab) {
+                0 -> RequestsTab(api)
+                1 -> DiscoverTab(api)
+                2 -> SeerrUsersTab(api)
+                else -> SeerrServerTab(cfg, nav)
+            }
         }
     }
 }
@@ -205,13 +224,18 @@ private fun DiscoverTab(api: SeerrApi) {
 
 // ============================================================ Tautulli
 @Composable
-fun TautulliScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
+fun TautulliScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, isRoot: Boolean, back: () -> Unit) {
     val api = remember(cfg) { TautulliApi(cfg) }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
     AppScaffold(title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
-        tabs = listOf("Activity", "History", "Stats"), selectedTab = tab, onTab = { tab = it }) { pad ->
+        bottomTabs = listOf(
+            BottomTab("Activity", Icons.Filled.PlayCircle), BottomTab("History", Icons.Filled.History),
+            BottomTab("Stats", Icons.Filled.BarChart), BottomTab("Users", Icons.Filled.People), BottomTab("Server", Icons.Filled.Dns),
+        ), selectedBottom = tab, onBottom = { tab = it }) { pad ->
         Box(Modifier.padding(pad)) {
             when (tab) {
+                3 -> TautulliUsersTab(api)
+                4 -> TautulliServerTab(cfg, nav)
                 0 -> ActivityTab(api)
                 1 -> {
                     val l = rememberLoadable(cfg, "hist") { api.history() }
@@ -294,16 +318,20 @@ private fun ActivityTab(api: TautulliApi) {
 
 // ============================================================ Unraid
 @Composable
-fun UnraidScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
+fun UnraidScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, isRoot: Boolean, back: () -> Unit) {
     val api = remember(cfg) { UnraidApi(cfg) }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
     AppScaffold(title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
-        tabs = listOf("Overview", "Docker", "VMs"), selectedTab = tab, onTab = { tab = it }) { pad ->
+        bottomTabs = listOf(
+            BottomTab("Overview", Icons.Filled.Dashboard), BottomTab("Docker", Icons.Filled.ViewInAr),
+            BottomTab("VMs", Icons.Filled.Computer), BottomTab("Server", Icons.Filled.Dns),
+        ), selectedBottom = tab, onBottom = { tab = it }) { pad ->
         Box(Modifier.padding(pad)) {
             when (tab) {
                 0 -> UnraidOverview(api)
                 1 -> UnraidDocker(api)
-                else -> UnraidVms(api)
+                2 -> UnraidVms(api)
+                else -> GenericServerTab(cfg, nav)
             }
         }
     }
@@ -312,7 +340,7 @@ fun UnraidScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
 private class UnraidOverviewData(val system: UnraidSystem?, val array: UnraidArray?, val sysError: String?, val arrError: String?, val unread: Int)
 
 @Composable
-private fun UnraidOverview(api: UnraidApi) {
+fun UnraidOverview(api: UnraidApi) {
     val l = rememberLoadable(api.cfg, "overview", autoRefreshMs = 10000) {
         var se: String? = null
         var ae: String? = null

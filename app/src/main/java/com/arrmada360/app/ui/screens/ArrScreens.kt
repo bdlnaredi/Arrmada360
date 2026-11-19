@@ -32,6 +32,20 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MonitorHeart
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.TravelExplore
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.RssFeed
+import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckCircle
@@ -91,6 +105,9 @@ import com.arrmada360.app.data.ConfigStore
 import com.arrmada360.app.data.ServiceConfig
 import com.arrmada360.app.data.ServiceType
 import com.arrmada360.app.ui.AppScaffold
+import com.arrmada360.app.ui.BottomTab
+import com.arrmada360.app.ui.MenuRow
+import com.arrmada360.app.ui.Rainbow
 import com.arrmada360.app.ui.Bad
 import com.arrmada360.app.ui.ChipRow
 import com.arrmada360.app.ui.Dropdown
@@ -121,17 +138,25 @@ private val SORTS = listOf("Title", "Recently added", "Year", "Size on disk")
 fun ArrScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () -> Unit) {
     val api = remember(cfg) { ArrApi(cfg) }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
-    val tabs = listOf(if (cfg.type == ServiceType.RADARR) "Movies" else api.itemWord.let { if (it == "Series") "Series" else it + "s" },
-        "Calendar", "Queue", "History", "Wanted")
+    var libView by rememberSaveable(cfg.id + "lib") { mutableIntStateOf(0) }
+    val libWord = if (cfg.type == ServiceType.RADARR) "Movies" else api.itemWord.let { if (it == "Series") "Series" else it + "s" }
+    val bottom = listOf(
+        BottomTab("Library", Icons.Filled.VideoLibrary),
+        BottomTab("Queue", Icons.Filled.Download),
+        BottomTab("Add", Icons.Filled.AddCircle),
+        BottomTab("History", Icons.Filled.History),
+        BottomTab("Server", Icons.Filled.Dns),
+    )
     var menu by remember { mutableStateOf(false) }
     var showDisk by remember { mutableStateOf(false) }
     val run = rememberRunner()
 
     AppScaffold(
-        title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
-        tabs = tabs, selectedTab = tab, onTab = { tab = it },
+        title = cfg.name, subtitle = bottom[tab].label, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
+        tabs = if (tab == 0) listOf(libWord, "Calendar", "Missing") else emptyList(), selectedTab = libView, onTab = { libView = it },
+        bottomTabs = bottom, selectedBottom = tab, onBottom = { tab = it },
         actions = {
-            IconButton(onClick = { nav.push(Route.ArrAdd(cfg.id)) }) { Icon(Icons.Filled.Search, "Add new") }
+            IconButton(onClick = { tab = 2 }) { Icon(Icons.Filled.Search, "Add new") }
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "More") }
                 DropdownMenu(menu, { menu = false }) {
@@ -152,22 +177,172 @@ fun ArrScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () -> U
             }
         },
         fab = {
-            if (tab == 0) FloatingActionButton(onClick = { nav.push(Route.ArrAdd(cfg.id)) }, containerColor = MaterialTheme.colorScheme.primary, shape = androidx.compose.foundation.shape.CircleShape) {
+            if (tab == 0 && libView == 0) FloatingActionButton(onClick = { tab = 2 }, containerColor = MaterialTheme.colorScheme.primary, shape = androidx.compose.foundation.shape.CircleShape) {
                 Icon(Icons.Filled.Add, "Add")
             }
         },
     ) { pad ->
         Box(Modifier.padding(pad)) {
             when (tab) {
-                0 -> LibraryTab(api, nav)
-                1 -> CalendarTab(api, nav, wanted = false)
-                2 -> QueueTab(api)
+                0 -> when (libView) {
+                    1 -> CalendarTab(api, nav, wanted = false)
+                    2 -> CalendarTab(api, nav, wanted = true)
+                    else -> LibraryTab(api, nav)
+                }
+                1 -> QueueTab(api)
+                2 -> ArrAddContent(cfg, "", nav) { id -> if (id > 0) nav.push(Route.ArrDetail(cfg.id, id)) }
                 3 -> HistoryTab(api)
-                else -> CalendarTab(api, nav, wanted = true)
+                else -> ArrServerTab(api, nav)
             }
         }
     }
     if (showDisk) DiskDialog(api) { showDisk = false }
+}
+
+/** System status, health warnings, disk space and scheduled tasks for any *arr app (incl. Prowlarr). */
+private class ArrServerData(val status: org.json.JSONObject, val health: List<com.arrmada360.app.api.HealthIssue>, val disks: List<com.arrmada360.app.api.DiskSpace>, val tasks: List<com.arrmada360.app.api.TaskInfo>)
+
+@Composable
+fun ArrServerTab(api: ArrApi, nav: Navigator) {
+    val run = rememberRunner()
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    val cfg = api.cfg
+    val t = cfg.type
+    val st = rememberLoadable(cfg, "srvstatus") { api.systemStatus() }
+    val health = rememberLoadable(cfg, "srvhealth") { try { api.healthIssues() } catch (e: Exception) { emptyList() } }
+    val (missingTask, refreshTask, libWord) = when (t) {
+        ServiceType.SONARR -> Triple("MissingEpisodeSearch", "RefreshSeries", "series")
+        ServiceType.RADARR -> Triple("MissingMoviesSearch", "RefreshMovie", "movies")
+        ServiceType.LIDARR -> Triple("MissingAlbumSearch", "RefreshArtist", "artists")
+        ServiceType.READARR -> Triple("MissingBookSearch", "RefreshAuthor", "authors")
+        else -> Triple("", "", "")
+    }
+    LazyColumn(contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp)) {
+        item {
+            val v = st.data?.optString("version") ?: ""
+            MenuRow(Icons.Filled.Settings, "${cfg.name} instance settings",
+                listOf(cfg.baseUrl, if (v.isNotEmpty()) "v$v" else "").filter { it.isNotEmpty() }.joinToString(" · "), t.tint) {
+                nav.push(Route.EditService(cfg.id, null))
+            }
+        }
+        item { MenuRow(Icons.Filled.Public, "View on web", "Open ${t.label} in your browser", t.tint2, external = true) { uri.openUri(cfg.baseUrl) } }
+        if (t.isArr) {
+            item { MenuRow(Icons.Filled.DriveFileMove, "Manual import", "Import files from a folder or a stuck download", Rainbow[1]) { nav.push(Route.ManualImport(cfg.id)) } }
+            item { MenuRow(Icons.Filled.RssFeed, "RSS sync", "Check your indexers for new releases now", Rainbow[3], arrow = false) { run("RSS sync started") { api.runTask("RssSync") } } }
+            item { MenuRow(Icons.Filled.Sync, "Update library", "Refresh & rescan all $libWord", Rainbow[4], arrow = false) { run("Library update started") { api.runTask(refreshTask) } } }
+            item { MenuRow(Icons.Filled.TravelExplore, "Search all missing", "Search every monitored missing item", Rainbow[2], arrow = false) { run("Searching for all missing") { api.runTask(missingTask) } } }
+            item { MenuRow(Icons.Filled.CloudSync, "Refresh downloads", "Check download clients for finished items", Rainbow[0], arrow = false) { run("Checking downloads") { api.runTask("RefreshMonitoredDownloads") } } }
+        }
+        item {
+            val h = health.data
+            MenuRow(Icons.Filled.MonitorHeart, "System status",
+                when { h == null -> "Health, disk space, scheduled tasks"; h.isEmpty() -> "All healthy · disk space · tasks"; else -> "${h.size} health warning${if (h.size == 1) "" else "s"} · disk space · tasks" },
+                if (h != null && h.isNotEmpty()) Warn else Good) { nav.push(Route.ArrSystem(cfg.id)) }
+        }
+    }
+}
+
+@Composable
+fun ArrSystemScreen(cfg: ServiceConfig, back: () -> Unit) {
+    val api = remember(cfg) { ArrApi(cfg) }
+    AppScaffold(title = "System status", subtitle = cfg.name, isRoot = false, onBack = back, badge = cfg.type, badgeName = cfg.name) { pad ->
+        Box(Modifier.padding(pad)) { ArrSystemContent(api) }
+    }
+}
+
+@Composable
+fun ArrSystemContent(api: ArrApi) {
+    val run = rememberRunner()
+    var confirmRestart by remember { mutableStateOf(false) }
+    val l = rememberLoadable(api.cfg, "server") {
+        ArrServerData(
+            api.systemStatus(),
+            try { api.healthIssues() } catch (e: Exception) { emptyList() },
+            try { api.diskSpace() } catch (e: Exception) { emptyList() },
+            try { api.tasks() } catch (e: Exception) { emptyList() },
+        )
+    }
+    LoadableContent(l) { d ->
+        LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                Panel(Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        com.arrmada360.app.ui.ServiceBadge(api.type, 56.dp, api.cfg.name)
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("${d.status.optString("appName", api.type.label)} ${d.status.optString("version")}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                            val os = listOf(d.status.optString("osName"), d.status.optString("osVersion")).filter { it.isNotEmpty() && it != "null" }.joinToString(" ")
+                            if (os.isNotEmpty()) Text(os, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            val branch = d.status.optString("branch")
+                            if (branch.isNotEmpty()) Text("Branch: $branch", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            val started = d.status.optString("startTime")
+                            if (started.isNotEmpty()) Text("Running since ${fmtDate(started, true)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatTile("Health", if (d.health.isEmpty()) "All good" else "${d.health.size} issue${if (d.health.size == 1) "" else "s"}", if (d.health.isEmpty()) Good else Warn, Modifier.weight(1f))
+                    StatTile("Disks", d.disks.size.toString(), MaterialTheme.colorScheme.primary, Modifier.weight(1f))
+                    StatTile("Tasks", d.tasks.size.toString(), MaterialTheme.colorScheme.secondary, Modifier.weight(1f))
+                }
+            }
+            if (d.health.isNotEmpty()) {
+                item { SectionTitle("Health") }
+                items(d.health) { h ->
+                    Panel(Modifier.fillMaxWidth(), tint = if (h.type.equals("error", true)) Bad else Warn) {
+                        Column(Modifier.padding(12.dp)) {
+                            Pill(h.type.replaceFirstChar { it.uppercase() }, if (h.type.equals("error", true)) Bad else Warn)
+                            Spacer(Modifier.height(4.dp))
+                            Text(h.message, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+            if (d.disks.isNotEmpty()) {
+                item { SectionTitle("Disk space") }
+                items(d.disks) { s ->
+                    val used = if (s.total > 0) 1f - s.free.toFloat() / s.total else 0f
+                    Panel(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(12.dp)) {
+                            Row {
+                                Text(s.label.ifEmpty { s.path }, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("${(used * 100).toInt()}%", style = MaterialTheme.typography.titleSmall, color = if (used > 0.9f) Bad else MaterialTheme.colorScheme.primary)
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            ProgressBar(used, color = if (used > 0.9f) Bad else MaterialTheme.colorScheme.primary, height = 7.dp)
+                            Spacer(Modifier.height(4.dp))
+                            Text("${humanBytes(s.free)} free of ${humanBytes(s.total)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+            if (d.tasks.isNotEmpty()) {
+                item { SectionTitle("Scheduled tasks") }
+                items(d.tasks) { t ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(t.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text("Every ${t.interval} min · last ${fmtDate(t.last, true)} · next ${fmtDate(t.next, true)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        IconButton(onClick = { run("${t.name} started") { api.runTask(t.taskName) } }) { Icon(Icons.Filled.PlayArrow, "Run now", tint = MaterialTheme.colorScheme.primary) }
+                    }
+                }
+            }
+            item {
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.material3.OutlinedButton(onClick = { confirmRestart = true }, modifier = Modifier.fillMaxWidth()) { Text("Restart ${api.type.label}", color = Bad) }
+            }
+        }
+    }
+    if (confirmRestart) AlertDialog(
+        onDismissRequest = { confirmRestart = false },
+        title = { Text("Restart ${api.cfg.name}?") },
+        text = { Text("It will be unavailable for a few seconds.") },
+        confirmButton = { TextButton(onClick = { confirmRestart = false; run("Restarting…") { api.restart() } }) { Text("Restart", color = Bad) } },
+        dismissButton = { TextButton(onClick = { confirmRestart = false }) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -196,7 +371,7 @@ private fun DiskDialog(api: ArrApi, onDismiss: () -> Unit) {
 
 // ------------------------------------------------------------ Library
 @Composable
-private fun LibraryTab(api: ArrApi, nav: Navigator) {
+fun LibraryTab(api: ArrApi, nav: Navigator) {
     val l = rememberLoadable(api.cfg) { api.library() }
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableIntStateOf(0) }
@@ -295,7 +470,7 @@ private fun PosterTile(m: MediaItem, onClick: () -> Unit) {
 
 // ------------------------------------------------------------ Calendar & Wanted
 @Composable
-private fun CalendarTab(api: ArrApi, nav: Navigator, wanted: Boolean) {
+fun CalendarTab(api: ArrApi, nav: Navigator, wanted: Boolean) {
     val l = rememberLoadable(api.cfg, wanted) { if (wanted) api.wanted() else api.calendar() }
     val run = rememberRunner()
     LoadableContent(l, empty = { it.isEmpty() }, emptyText = if (wanted) "Nothing missing 🎉" else "Nothing coming up in the next 30 days") { list ->
@@ -726,38 +901,50 @@ private fun ReleaseRow(r: ReleaseEntry, onGrab: () -> Unit) {
 @Composable
 fun ArrAddScreen(cfg: ServiceConfig, initialTerm: String, nav: Navigator, back: () -> Unit) {
     val api = remember(cfg) { ArrApi(cfg) }
-    var term by rememberSaveable { mutableStateOf(initialTerm) }
-    var submitted by rememberSaveable { mutableStateOf(initialTerm) }
+    AppScaffold(title = "Add ${api.itemWord.lowercase()}", subtitle = cfg.name, isRoot = false, onBack = back) { pad ->
+        Box(Modifier.padding(pad)) {
+            ArrAddContent(cfg, initialTerm, nav) { newId ->
+                nav.pop()
+                if (newId > 0) nav.push(Route.ArrDetail(cfg.id, newId))
+            }
+        }
+    }
+}
+
+@Composable
+fun ArrAddContent(cfg: ServiceConfig, initialTerm: String, nav: Navigator, onAdded: (Int) -> Unit) {
+    val api = remember(cfg) { ArrApi(cfg) }
+    var term by rememberSaveable(cfg.id + "addterm") { mutableStateOf(initialTerm) }
+    var submitted by rememberSaveable(cfg.id + "addsub") { mutableStateOf(initialTerm) }
     val results = rememberLoadable(cfg, submitted) { if (submitted.isBlank()) emptyList() else api.lookup(submitted) }
     var adding by remember { mutableStateOf<MediaItem?>(null) }
 
-    AppScaffold(title = "Add ${api.itemWord.lowercase()}", subtitle = cfg.name, isRoot = false, onBack = back) { pad ->
-        Column(Modifier.padding(pad).fillMaxSize().imePadding()) {
-            OutlinedTextField(
-                term, { term = it }, singleLine = true,
-                placeholder = { Text(when (cfg.type) { ServiceType.SONARR -> "Show name or tvdb:12345"; ServiceType.RADARR -> "Movie name, tmdb:123 or imdb:tt…"; ServiceType.LIDARR -> "Artist name"; else -> "Author name" }) },
-                leadingIcon = { Icon(Icons.Filled.Search, null) },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { submitted = term.trim() }),
-                modifier = Modifier.fillMaxWidth().padding(12.dp), shape = RoundedCornerShape(12.dp),
-            )
-            if (submitted.isBlank()) EmptyBox("Search for something to add")
-            else LoadableContent(results, empty = { it.isEmpty() }, emptyText = "No results") { list ->
-                LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(list) { m ->
-                        val inLib = m.id > 0
-                        Panel(Modifier.fillMaxWidth(), onClick = { if (inLib) nav.push(Route.ArrDetail(cfg.id, m.id)) else adding = m }) {
-                            Row(Modifier.padding(10.dp)) {
-                                Poster(m.poster, Modifier.width(70.dp), ratio = if (cfg.type == ServiceType.LIDARR) 1f else 2f / 3f, fallback = m.title)
-                                Spacer(Modifier.width(12.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(m.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
-                                    Text(listOf(if (m.year > 0) m.year.toString() else "", m.network).filter { it.isNotEmpty() }.joinToString(" · "),
-                                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    if (inLib) { Spacer(Modifier.height(4.dp)); Pill("In library", Good) }
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(m.overview, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
+    Column(Modifier.fillMaxSize().imePadding()) {
+        OutlinedTextField(
+            term, { term = it }, singleLine = true,
+            placeholder = { Text(when (cfg.type) { ServiceType.SONARR -> "Show name or tvdb:12345"; ServiceType.RADARR -> "Movie name, tmdb:123 or imdb:tt…"; ServiceType.LIDARR -> "Artist name"; else -> "Author name" }) },
+            leadingIcon = { Icon(Icons.Filled.Search, null) },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { submitted = term.trim() }),
+            modifier = Modifier.fillMaxWidth().padding(12.dp), shape = RoundedCornerShape(12.dp),
+        )
+        if (submitted.isBlank()) EmptyBox("Search for something new to add to ${cfg.name}")
+        else LoadableContent(results, empty = { it.isEmpty() }, emptyText = "No results") { list ->
+            LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(list) { m ->
+                    val inLib = m.id > 0
+                    Panel(Modifier.fillMaxWidth(), tint = if (inLib) Good else null, onClick = { if (inLib) nav.push(Route.ArrDetail(cfg.id, m.id)) else adding = m }) {
+                        Row(Modifier.padding(10.dp)) {
+                            Poster(m.poster, Modifier.width(70.dp), ratio = if (cfg.type == ServiceType.LIDARR) 1f else 2f / 3f, fallback = m.title)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(m.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(listOf(if (m.year > 0) m.year.toString() else "", m.network).filter { it.isNotEmpty() }.joinToString(" · "),
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.height(4.dp))
+                                if (inLib) Pill("✓ In library", Good) else Pill("+ Tap to add", MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.height(4.dp))
+                                Text(m.overview, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -769,8 +956,7 @@ fun ArrAddScreen(cfg: ServiceConfig, initialTerm: String, nav: Navigator, back: 
     adding?.let { m ->
         AddSheet(api, m, onDismiss = { adding = null }) { newId ->
             adding = null
-            nav.pop()
-            if (newId > 0) nav.push(Route.ArrDetail(cfg.id, newId))
+            onAdded(newId)
         }
     }
 }

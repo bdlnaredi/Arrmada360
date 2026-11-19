@@ -33,6 +33,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckCircle
@@ -93,7 +96,7 @@ import com.arrmada360.app.ui.rememberRunner
 private val DL_SORTS = listOf("Added (newest)", "Name", "Progress", "Size", "Download speed", "Upload speed", "Ratio")
 
 @Composable
-fun DownloadsScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
+fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, isRoot: Boolean, back: () -> Unit) {
     val client = remember(cfg) { DownloadClients.of(cfg) } ?: return EmptyBox("Unsupported client")
     val snap = rememberLoadable(cfg, autoRefreshMs = 2500) { DownloadClients.snapshot(client) }
     val run = rememberRunner()
@@ -117,7 +120,15 @@ fun DownloadsScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
         subtitle = if (selection.isEmpty()) subtitle else null,
         isRoot = isRoot && selection.isEmpty(), onBack = { if (selection.isNotEmpty()) selection = emptySet() else back() },
         badge = if (selection.isEmpty()) cfg.type else null, badgeName = cfg.name,
-        tabs = if (client.hasHistory) listOf("Queue", "History") else emptyList(), selectedTab = tab, onTab = { tab = it },
+        bottomTabs = if (client.hasHistory) listOf(
+            com.arrmada360.app.ui.BottomTab("Queue", androidx.compose.material.icons.Icons.Filled.Download),
+            com.arrmada360.app.ui.BottomTab("History", androidx.compose.material.icons.Icons.Filled.History),
+            com.arrmada360.app.ui.BottomTab("Server", androidx.compose.material.icons.Icons.Filled.Dns),
+        ) else listOf(
+            com.arrmada360.app.ui.BottomTab("Torrents", androidx.compose.material.icons.Icons.Filled.Download),
+            com.arrmada360.app.ui.BottomTab("Server", androidx.compose.material.icons.Icons.Filled.Dns),
+        ),
+        selectedBottom = tab, onBottom = { tab = it },
         actions = {
             if (selection.isNotEmpty()) {
                 IconButton(onClick = { val ids = selection.toList(); run("Resumed", refresh) { client.resume(ids) } }) { Icon(Icons.Filled.PlayArrow, "Resume") }
@@ -150,10 +161,13 @@ fun DownloadsScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
                 }
             }
         },
-        fab = { if (tab == 0) FloatingActionButton(onClick = { addOpen = true }, containerColor = MaterialTheme.colorScheme.primary) { Icon(Icons.Filled.Add, "Add") } },
+        fab = { if (tab == 0 && selection.isEmpty()) FloatingActionButton(onClick = { addOpen = true }, containerColor = MaterialTheme.colorScheme.primary) { Icon(Icons.Filled.Add, "Add") } },
     ) { pad ->
         Column(Modifier.padding(pad)) {
-            if (tab == 1) {
+            val serverTab = if (client.hasHistory) 2 else 1
+            if (tab == serverTab) {
+                DownloaderServerTab(cfg, nav)
+            } else if (tab == 1) {
                 val h = rememberLoadable(cfg, "history") { client.history() }
                 LoadableContent(h, empty = { it.isEmpty() }, emptyText = "No history") { list ->
                     LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {

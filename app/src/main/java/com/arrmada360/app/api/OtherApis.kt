@@ -99,6 +99,31 @@ class ProwlarrApi(val cfg: ServiceConfig) {
     }
 }
 
+data class IndexerStat(val name: String, val queries: Int, val grabs: Int, val failed: Int, val avgMs: Int)
+data class SearchHistory(val event: String, val query: String, val indexer: String, val date: String, val ok: Boolean)
+
+suspend fun ProwlarrApi.stats(): List<IndexerStat> {
+    val s = Http.exec(Http.client(cfg.trustAllCerts), Request.Builder().url(buildUrl("${cfg.baseUrl}/api/v1/indexerstats")).header("X-Api-Key", cfg.apiKey).build())
+    return JSONObject(s).arr("indexers").objects().map {
+        IndexerStat(it.str("indexerName"), it.int("numberOfQueries"), it.int("numberOfGrabs"), it.int("numberOfFailedQueries"), it.int("averageResponseTime"))
+    }.sortedByDescending { it.queries }
+}
+
+suspend fun ProwlarrApi.searchHistory(): List<SearchHistory> {
+    val names = try { indexers().associate { it.id to it.name } } catch (e: Exception) { emptyMap() }
+    val u = buildUrl("${cfg.baseUrl}/api/v1/history", mapOf("pageSize" to 100, "sortKey" to "date", "sortDirection" to "descending"))
+    val s = Http.exec(Http.client(cfg.trustAllCerts), Request.Builder().url(u).header("X-Api-Key", cfg.apiKey).build())
+    return JSONObject(s).arr("records").objects().map {
+        val d = it.obj("data")
+        SearchHistory(
+            event = it.str("eventType").replace(Regex("([a-z])([A-Z])"), "$1 $2").replaceFirstChar { c -> c.uppercase() },
+            query = d?.str("query")?.ifEmpty { null } ?: d?.str("grabTitle")?.ifEmpty { null } ?: d?.str("title") ?: "",
+            indexer = names[it.int("indexerId")] ?: "",
+            date = it.str("date"), ok = it.bool("successful", true),
+        )
+    }
+}
+
 class JackettApi(val cfg: ServiceConfig) {
     private val client = Http.client(cfg.trustAllCerts)
 
@@ -149,6 +174,9 @@ data class SeerrRequest(
     val seasons: String,
     val is4k: Boolean,
 )
+
+data class SeerrUser(val id: Int, val name: String, val email: String, val requests: Int, val avatar: String?)
+data class SeerrJob(val id: String, val name: String, val type: String, val next: String, val running: Boolean)
 
 class SeerrApi(val cfg: ServiceConfig) {
     private val client = Http.client(cfg.trustAllCerts)
@@ -230,6 +258,24 @@ class SeerrApi(val cfg: ServiceConfig) {
     }
 
     suspend fun counts(): JSONObject = get("request/count")
+
+    suspend fun users(): List<SeerrUser> = get("user", mapOf("take" to 100, "skip" to 0, "sort" to "requests")).arr("results").objects().map {
+        val av = it.str("avatar")
+        SeerrUser(
+            id = it.int("id"),
+            name = it.str("displayName").ifEmpty { it.str("plexUsername") }.ifEmpty { it.str("username") }.ifEmpty { it.str("email") },
+            email = it.str("email"), requests = it.int("requestCount"),
+            avatar = if (av.startsWith("/")) cfg.baseUrl + av else av.ifEmpty { null },
+        )
+    }
+
+    suspend fun statusObj(): JSONObject = get("status")
+
+    suspend fun jobs(): List<SeerrJob> = JSONArray(Http.exec(client, rb("settings/jobs").build())).objects().map {
+        SeerrJob(it.str("id"), it.str("name"), it.str("type"), it.str("nextExecutionTime"), it.bool("running"))
+    }
+
+    suspend fun runJob(id: String) { post("settings/jobs/$id/run") }
 }
 
 // ======================= Tautulli =======================
@@ -249,6 +295,9 @@ data class StreamSession(
 )
 
 data class PlayHistory(val user: String, val title: String, val date: Long, val duration: Long, val percent: Int, val player: String, val thumb: String?)
+
+data class TautulliUser(val name: String, val plays: Int, val lastSeen: Long, val duration: Long, val thumb: String?, val lastPlayed: String)
+data class TautulliLibrary(val name: String, val type: String, val count: Int, val parents: Int, val children: Int)
 
 class TautulliApi(val cfg: ServiceConfig) {
     private val client = Http.client(cfg.trustAllCerts)
@@ -295,6 +344,18 @@ class TautulliApi(val cfg: ServiceConfig) {
                 percent = h.int("percent_complete"), player = h.str("player"),
                 thumb = imageUrl(if (h.str("media_type") == "episode") h.str("grandparent_thumb") else h.str("thumb")),
             )
+        }
+
+    suspend fun users(): List<TautulliUser> =
+        (cmd("get_users_table", mapOf("length" to 100, "order_column" to "plays", "order_dir" to "desc")).obj("data")?.arr("data") ?: JSONArray()).objects().map {
+            TautulliUser(it.str("friendly_name"), it.int("plays"), it.long("last_seen"), it.long("duration"), it.str("user_thumb").ifEmpty { null }, it.str("last_played"))
+        }
+
+    suspend fun serverInfo(): JSONObject = cmd("get_server_info").obj("data") ?: JSONObject()
+
+    suspend fun libraries(): List<TautulliLibrary> =
+        (cmd("get_libraries").optJSONArray("data") ?: JSONArray()).objects().map {
+            TautulliLibrary(it.str("section_name"), it.str("section_type"), it.int("count"), it.int("parent_count"), it.int("child_count"))
         }
 
     suspend fun terminate(sessionId: String, message: String) {

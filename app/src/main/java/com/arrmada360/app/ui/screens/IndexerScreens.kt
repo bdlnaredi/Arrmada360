@@ -21,6 +21,10 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -84,18 +88,37 @@ import kotlinx.coroutines.coroutineScope
 private val RESULT_SORTS = listOf("Seeders", "Size", "Newest", "Title")
 
 @Composable
-fun IndexerScreen(cfg: ServiceConfig, isRoot: Boolean, back: () -> Unit) {
+fun IndexerScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () -> Unit) {
     val prowlarr = remember(cfg) { if (cfg.type == ServiceType.PROWLARR) ProwlarrApi(cfg) else null }
     val jackett = remember(cfg) { if (cfg.type == ServiceType.JACKETT) JackettApi(cfg) else null }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
     AppScaffold(
         title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
-        tabs = if (prowlarr != null) listOf("Search", "Indexers") else emptyList(), selectedTab = tab, onTab = { tab = it },
+        bottomTabs = if (prowlarr != null) listOf(
+            com.arrmada360.app.ui.BottomTab("Search", Icons.Filled.Search),
+            com.arrmada360.app.ui.BottomTab("Indexers", androidx.compose.material.icons.Icons.Filled.Storage),
+            com.arrmada360.app.ui.BottomTab("Stats", androidx.compose.material.icons.Icons.Filled.BarChart),
+            com.arrmada360.app.ui.BottomTab("History", androidx.compose.material.icons.Icons.Filled.History),
+            com.arrmada360.app.ui.BottomTab("Server", androidx.compose.material.icons.Icons.Filled.Dns),
+        ) else listOf(
+            com.arrmada360.app.ui.BottomTab("Search", Icons.Filled.Search),
+            com.arrmada360.app.ui.BottomTab("Server", androidx.compose.material.icons.Icons.Filled.Dns),
+        ),
+        selectedBottom = tab, onBottom = { tab = it },
     ) { pad ->
         Box(Modifier.padding(pad)) {
-            if (tab == 1 && prowlarr != null) IndexersTab(prowlarr)
-            else SearchTab(cfg.id) { q, cats ->
-                if (prowlarr != null) prowlarr.search(q, cats) else jackett!!.search(q, cats)
+            val search: @Composable () -> Unit = {
+                SearchTab(cfg.id) { q, cats -> if (prowlarr != null) prowlarr.search(q, cats) else jackett!!.search(q, cats) }
+            }
+            if (prowlarr != null) when (tab) {
+                1 -> IndexersTab(prowlarr)
+                2 -> ProwlarrStatsTab(prowlarr)
+                3 -> ProwlarrHistoryTab(prowlarr)
+                4 -> ArrServerTab(remember(cfg) { ArrApi(cfg) }, nav)
+                else -> search()
+            } else when (tab) {
+                1 -> GenericServerTab(cfg, nav)
+                else -> search()
             }
         }
     }

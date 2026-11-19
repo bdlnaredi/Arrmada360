@@ -72,6 +72,7 @@ data class QueueEntry(
     val client: String,
     val protocol: String,
     val warning: String,
+    val downloadId: String = "",
 )
 
 data class HistoryEntry(val title: String, val event: String, val date: String, val quality: String)
@@ -93,6 +94,20 @@ data class ReleaseEntry(
 )
 
 data class Profile(val id: Int, val name: String)
+data class ImportItem(
+    val path: String,
+    val name: String,
+    val size: Long,
+    val parentId: Int,
+    val parentTitle: String,
+    val childIds: List<Int>,
+    val childText: String,
+    val quality: String,
+    val rejections: List<String>,
+    val raw: JSONObject,
+)
+data class HealthIssue(val source: String, val type: String, val message: String)
+data class TaskInfo(val name: String, val taskName: String, val interval: Int, val last: String, val next: String)
 data class RootFolder(val path: String, val free: Long)
 data class DiskSpace(val path: String, val label: String, val free: Long, val total: Long)
 
@@ -138,6 +153,62 @@ class ArrApi(val cfg: ServiceConfig) {
         val s = get(path, q)
         val t = s.trim()
         if (t.startsWith("{")) JSONObject(t).arr("records").objects() else JSONArray(t).objects()
+    }
+
+    suspend fun systemStatus(): JSONObject = JSONObject(get("system/status"))
+    suspend fun healthIssues(): List<HealthIssue> = fetchList("health").map { HealthIssue(it.str("source"), it.str("type"), it.str("message")) }
+    suspend fun tasks(): List<TaskInfo> = fetchList("system/task").map {
+        TaskInfo(it.str("name"), it.str("taskName"), it.int("interval"), it.str("lastExecution"), it.str("nextExecution"))
+    }.sortedBy { it.name }
+    suspend fun restart() { post("system/restart", "{}") }
+
+    // ---------------- manual import ----------------
+    suspend fun manualImportList(folder: String?, downloadId: String?): List<ImportItem> {
+        val q = mutableMapOf<String, Any?>("filterExistingFiles" to true)
+        if (!folder.isNullOrBlank()) q["folder"] = folder
+        if (!downloadId.isNullOrBlank()) q["downloadId"] = downloadId
+        return fetchList("manualimport", q).map { o ->
+            val parent = o.obj("series") ?: o.obj("movie") ?: o.obj("artist") ?: o.obj("author")
+            val children = when (type) {
+                ServiceType.SONARR -> o.arr("episodes").objects()
+                ServiceType.LIDARR -> o.arr("tracks").objects()
+                else -> emptyList()
+            }
+            val childText = when (type) {
+                ServiceType.SONARR -> children.joinToString(", ") { "S%02dE%02d".format(it.int("seasonNumber"), it.int("episodeNumber")) }
+                ServiceType.LIDARR -> o.obj("album")?.str("title") ?: ""
+                ServiceType.READARR -> o.obj("book")?.str("title") ?: ""
+                else -> ""
+            }
+            ImportItem(
+                path = o.str("path"), name = o.str("relativePath").ifEmpty { o.str("name") }, size = o.long("size"),
+                parentId = parent?.int("id") ?: 0,
+                parentTitle = parent?.str("title")?.ifEmpty { null } ?: parent?.str("artistName")?.ifEmpty { null } ?: parent?.str("authorName") ?: "",
+                childIds = children.map { it.int("id") }, childText = childText,
+                quality = o.obj("quality")?.obj("quality")?.str("name") ?: "",
+                rejections = o.arr("rejections").objects().map { it.str("reason") },
+                raw = o,
+            )
+        }
+    }
+
+    suspend fun manualImport(items: List<ImportItem>, mode: String) {
+        val files = JSONArray()
+        items.forEach { i ->
+            val f = JSONObject().put("path", i.path)
+            i.raw.opt("quality")?.let { f.put("quality", it) }
+            i.raw.opt("languages")?.let { f.put("languages", it) }
+            f.put("releaseGroup", i.raw.str("releaseGroup"))
+            f.put("downloadId", i.raw.str("downloadId"))
+            when (type) {
+                ServiceType.SONARR -> f.put("seriesId", i.parentId).put("episodeIds", intsJson(i.childIds))
+                ServiceType.RADARR -> f.put("movieId", i.parentId)
+                ServiceType.LIDARR -> f.put("artistId", i.parentId).put("albumId", i.raw.obj("album")?.int("id") ?: 0).put("trackIds", intsJson(i.childIds))
+                else -> f.put("authorId", i.parentId).put("bookId", i.raw.obj("book")?.int("id") ?: 0)
+            }
+            files.put(f)
+        }
+        command(JSONObject().put("name", "ManualImport").put("files", files).put("importMode", mode))
     }
 
     suspend fun status(): String {
@@ -368,6 +439,7 @@ class ArrApi(val cfg: ServiceConfig) {
                 size = o.dbl("size").toLong(), sizeLeft = o.dbl("sizeleft").toLong(),
                 timeLeft = o.str("timeleft"), client = o.str("downloadClient"), protocol = o.str("protocol"),
                 warning = warn.ifEmpty { o.str("errorMessage") },
+                downloadId = o.str("downloadId"),
             )
         }
     }
