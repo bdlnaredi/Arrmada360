@@ -356,10 +356,10 @@ private fun DiscoverSheet(i: DiscoverItem, isMovie: Boolean, lib: LibIndex?, nav
                         }
                     }
                     if (seerr != null && i.tmdbId > 0) {
-                        MediaStatus.fromSeerr(i.seerrStatus)?.let { st ->
-                            Row(verticalAlignment = Alignment.CenterVertically) { MediaStatusIcon(st, 22.dp); Spacer(Modifier.width(8.dp)); Text(st.label + " in Seerr", color = Color.White, fontWeight = FontWeight.Bold) }
-                        }
-                        else OutlinedButton(onClick = {
+                        val seerrSt = MediaStatus.fromSeerr(i.seerrStatus)
+                        if (seerrSt != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically) { MediaStatusIcon(seerrSt, 22.dp); Spacer(Modifier.width(8.dp)); Text(seerrSt.label + " in Seerr", color = Color.White, fontWeight = FontWeight.Bold) }
+                        } else OutlinedButton(onClick = {
                             onDismiss()
                             run("Requested ${i.title}") {
                                 SeerrApi(seerr).request(SeerrMedia(i.tmdbId, i.mediaType, i.title, i.year, i.poster, i.backdrop, i.overview, i.seerrStatus))
