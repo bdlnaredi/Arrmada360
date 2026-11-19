@@ -90,6 +90,7 @@ interface RssClient {
     suspend fun rssRefresh(feed: RssFeed?)
     suspend fun rssMarkRead(feed: RssFeed?, article: RssArticle?) {}
     suspend fun rssDownload(article: RssArticle)
+    suspend fun rssDownload(article: RssArticle, category: String?) = rssDownload(article)
     suspend fun rssRules(): List<RssRule> = emptyList()
     suspend fun rssSaveRule(name: String, def: JSONObject) {}
     suspend fun rssRemoveRule(name: String) {}
@@ -115,6 +116,8 @@ interface DownloadClient {
     suspend fun resume(ids: List<String>)
     suspend fun delete(ids: List<String>, withData: Boolean)
     suspend fun addUrl(url: String)
+    /** Add with a category (qBittorrent) / label (ruTorrent). Other clients ignore the category. */
+    suspend fun addUrl(url: String, category: String?) = addUrl(url)
     suspend fun pauseAll()
     suspend fun resumeAll()
     suspend fun history(): List<DlHistory> = emptyList()
@@ -237,6 +240,11 @@ class QbitClient(override val cfg: ServiceConfig) : DownloadClient, RssClient {
     override suspend fun addUrl(url: String) {
         call("torrents/add", mapOf("urls" to url), multipart = true)
     }
+    override suspend fun addUrl(url: String, category: String?) {
+        val form = mutableMapOf("urls" to url)
+        if (!category.isNullOrBlank()) form["category"] = category
+        call("torrents/add", form, multipart = true)
+    }
 
     override val supportsCategories = true
     override suspend fun categories(): List<String> = try { JSONObject(call("torrents/categories")).keys().asSequence().toList().sortedBy { it.lowercase() } } catch (e: Exception) { emptyList() }
@@ -295,6 +303,7 @@ class QbitClient(override val cfg: ServiceConfig) : DownloadClient, RssClient {
         }
     }
     override suspend fun rssDownload(article: RssArticle) { addUrl(article.torrentUrl) }
+    override suspend fun rssDownload(article: RssArticle, category: String?) { addUrl(article.torrentUrl, category) }
 
     override suspend fun rssRules(): List<RssRule> {
         val o = JSONObject(call("rss/rules"))
@@ -526,6 +535,9 @@ class RutorrentClient(override val cfg: ServiceConfig) : DownloadClient, RssClie
     override suspend fun resumeAll() { resume(snapshot().items.map { it.id }) }
     override suspend fun delete(ids: List<String>, withData: Boolean) { action(if (withData) "removewithdata" else "remove", ids) }
     override suspend fun addUrl(url: String) { post("php/addtorrent.php", listOf("url" to url)) }
+    override suspend fun addUrl(url: String, category: String?) {
+        post("php/addtorrent.php", listOf("url" to url) + if (!category.isNullOrBlank()) listOf("label" to category) else emptyList())
+    }
 
     override val supportsCategories = true
     override suspend fun categories(): List<String> = snapshot().items.map { it.category }.filter { it.isNotEmpty() }.distinct().sortedBy { it.lowercase() }
@@ -561,6 +573,7 @@ class RutorrentClient(override val cfg: ServiceConfig) : DownloadClient, RssClie
         post("plugins/rss/action.php", if (feed != null) listOf("mode" to "refresh", "rss" to feed.key) else listOf("mode" to "refresh"))
     }
     override suspend fun rssDownload(article: RssArticle) { addUrl(article.torrentUrl) }
+    override suspend fun rssDownload(article: RssArticle, category: String?) { addUrl(article.torrentUrl, category) }
 }
 
 // ======================= SABnzbd =======================

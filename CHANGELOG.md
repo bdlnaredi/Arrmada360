@@ -8,6 +8,15 @@ Builds #2, #5 and #10 failed to compile in CI and were fixed straight away in bu
 
 ---
 
+## [Unreleased] – next build
+
+### Added
+- **RSS multi-select**: long-press an article or tap the checklist button. Then select all, download all, mark read, or download them all into a category.
+- **Download RSS articles to a category** (qBittorrent) or label (ruTorrent): pick an existing one or create a new one, with an optional save path on qBittorrent. The category button sits on every article row and in the article details.
+
+### Docs
+- README now shows the official app logos (linked from dashboard-icons). The banner no longer uses initials.
+
 ## [1.0.12] – 2026-11-19
 
 ### Added

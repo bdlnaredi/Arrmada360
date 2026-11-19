@@ -394,10 +394,8 @@ def banner():
     text(d, (90, 150), "Arrmada360", 110, "Black", (255, 255, 255))
     text(d, (96, 290), "Your whole media server in one Android app.", 40, "SemiBold", (230, 235, 245))
     text(d, (96, 350), "Every feature unlocked — free and open source.", 34, "Regular", (210, 218, 232))
-    x, y = 96, 450
-    for i, a in enumerate(APPS):
-        badge(d, x, y, a, 64); x += 80
-        if x > 1500: x, y = 96, y + 80
+    text(d, (96, 440), "Sonarr · Radarr · Lidarr · Readarr · Prowlarr · Jackett · qBittorrent · Transmission", 28, "Medium", (200, 210, 228))
+    text(d, (96, 486), "Deluge · ruTorrent · SABnzbd · NZBGet · Overseerr · Jellyseerr · Tautulli · Unraid", 28, "Medium", (200, 210, 228))
     im.save(f"{OUT}/banner.png", optimize=True); print("wrote banner.png")
 
 for fn in (onboarding, movies, server, sonarr, qbit, unraid, settings, rss, banner): fn()

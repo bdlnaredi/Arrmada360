@@ -23,6 +23,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
@@ -121,15 +127,50 @@ private fun ArticlesView(
     var unreadOnly by rememberSaveable { mutableStateOf(false) }
     var pick by remember { mutableStateOf<RssArticle?>(null) }
     var sendTo by remember { mutableStateOf<RssArticle?>(null) }
+    var selected by remember { mutableStateOf(setOf<String>()) }
+    var selecting by remember { mutableStateOf(false) }
+    var visible by remember { mutableStateOf(listOf<RssArticle>()) }
+    var catTarget by remember { mutableStateOf<List<RssArticle>?>(null) }
+    fun keyOf(a: RssArticle) = a.feedKey + "|" + a.id + a.title
+    val inSelect = selecting || selected.isNotEmpty()
+    fun download(list: List<RssArticle>, category: String?) {
+        val n = list.size
+        selected = emptySet(); selecting = false
+        run(if (n == 1) "Sent to ${cfg.name}" + (if (!category.isNullOrBlank()) " → $category" else "") else "Sent $n to ${cfg.name}" + (if (!category.isNullOrBlank()) " → $category" else ""), { feeds.load(true) }) {
+            list.forEach { a ->
+                rss.rssDownload(a, category)
+                if (client is QbitClient) try { rss.rssMarkRead(null, a) } catch (e: Exception) { }
+            }
+        }
+    }
     val all = feeds.data ?: emptyList()
     val names = listOf("All feeds") + all.map { it.name }
     val selectedIdx = if (feedFilter == null) 0 else (all.indexOfFirst { it.key == feedFilter } + 1).coerceAtLeast(0)
     Column {
+        if (inSelect) {
+            val chosen = visible.filter { keyOf(it) in selected }
+            Row(
+                Modifier.padding(horizontal = 12.dp, vertical = 4.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer).padding(start = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = { selected = emptySet(); selecting = false }) { Icon(Icons.Filled.Close, "Done") }
+                Text("${selected.size} selected", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.weight(1f))
+                IconButton(onClick = { selected = if (selected.size == visible.size) emptySet() else visible.map { keyOf(it) }.toSet() }) { Icon(Icons.Filled.SelectAll, "Select all") }
+                IconButton(enabled = chosen.isNotEmpty(), onClick = { download(chosen, null) }) { Icon(Icons.Filled.Download, "Download", tint = Good) }
+                if (client.supportsCategories) IconButton(enabled = chosen.isNotEmpty(), onClick = { catTarget = chosen }) { Icon(Icons.AutoMirrored.Filled.Label, "Download to category") }
+                if (client is QbitClient) IconButton(enabled = chosen.isNotEmpty(), onClick = {
+                    val c = chosen; selected = emptySet(); selecting = false
+                    run("Marked ${c.size} as read", { feeds.load(true) }) { c.forEach { rss.rssMarkRead(null, it) } }
+                }) { Icon(Icons.Filled.DoneAll, "Mark read") }
+            }
+        }
         Row(Modifier.padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(query, { query = it }, singleLine = true, placeholder = { Text("Search articles") }, leadingIcon = { Icon(Icons.Filled.Search, null) },
                 modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp))
             IconButton(onClick = { run("Refreshing feeds", { feeds.load(true) }) { rss.rssRefresh(all.firstOrNull { it.key == feedFilter }) } }) { Icon(Icons.Filled.Refresh, "Refresh") }
             if (client is QbitClient) IconButton(onClick = { run("Marked as read", { feeds.load(true) }) { rss.rssMarkRead(all.firstOrNull { it.key == feedFilter }, null) } }) { Icon(Icons.Filled.DoneAll, "Mark all read") }
+            if (!inSelect) IconButton(onClick = { selecting = true }) { Icon(Icons.Filled.Checklist, "Select multiple") }
         }
         ChipRow(names, selectedIdx, { i -> setFilter(if (i == 0) null else all.getOrNull(i - 1)?.key) }, Modifier.padding(vertical = 8.dp),
             counts = listOf(all.sumOf { f -> f.articles.count { !it.read } }) + all.map { f -> f.articles.count { !it.read } })
@@ -142,13 +183,25 @@ private fun ArticlesView(
                 .filter { query.isBlank() || it.title.contains(query.trim(), true) }
                 .filter { !unreadOnly || !it.read }
                 .sortedByDescending { it.date }
+            androidx.compose.runtime.LaunchedEffect(arts) { visible = arts }
             if (arts.isEmpty()) EmptyBox("No articles match")
             else LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item { Text("${arts.size} articles", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 items(arts, key = { it.feedKey + "|" + it.id + it.title }) { a ->
                     val color = Rainbow[(list.indexOfFirst { it.key == a.feedKey }.coerceAtLeast(0)) % Rainbow.size]
-                    Panel(Modifier.fillMaxWidth(), tint = color, onClick = { pick = a }) {
+                    val k = keyOf(a)
+                    val isSel = k in selected
+                    Panel(
+                        Modifier.fillMaxWidth(), tint = if (isSel) MaterialTheme.colorScheme.primary else color,
+                        onClick = { if (inSelect) { selected = if (isSel) selected - k else selected + k } else { pick = a } },
+                        onLongClick = { selected = if (isSel) selected - k else selected + k },
+                    ) {
                         Row(Modifier.padding(start = 12.dp, top = 10.dp, bottom = 10.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (inSelect) {
+                                Icon(if (isSel) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked, null,
+                                    tint = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.width(10.dp))
+                            }
                             if (!a.read && client is QbitClient) { StatusDot(color, 8.dp); Spacer(Modifier.width(8.dp)) }
                             Column(Modifier.weight(1f)) {
                                 Text(a.title, style = MaterialTheme.typography.bodyMedium, fontWeight = if (a.read) FontWeight.Normal else FontWeight.Bold,
@@ -159,8 +212,9 @@ private fun ArticlesView(
                                     if (a.date.isNotEmpty()) Text(fmtDate(a.date, true), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
-                            IconButton(onClick = { run("Sent to ${cfg.name}", { feeds.load(true) }) { rss.rssDownload(a); if (client is QbitClient) rss.rssMarkRead(null, a) } }) {
-                                Icon(Icons.Filled.Download, "Download", tint = Good)
+                            if (!inSelect) {
+                                if (client.supportsCategories) IconButton(onClick = { catTarget = listOf(a) }) { Icon(Icons.AutoMirrored.Filled.Label, "Download to category", tint = MaterialTheme.colorScheme.secondary) }
+                                IconButton(onClick = { download(listOf(a), null) }) { Icon(Icons.Filled.Download, "Download", tint = Good) }
                             }
                         }
                     }
@@ -181,13 +235,14 @@ private fun ArticlesView(
                         Text(android.text.Html.fromHtml(a.description, android.text.Html.FROM_HTML_MODE_COMPACT).toString().trim().take(1200), style = MaterialTheme.typography.bodySmall)
                     }
                     Spacer(Modifier.height(10.dp))
+                    if (client.supportsCategories) TextButton(onClick = { pick = null; catTarget = listOf(a) }) { Text("Download to a category…") }
                     TextButton(onClick = { pick = null; sendTo = a }) { Text("Send to another download client…") }
                     if (a.page.startsWith("http")) TextButton(onClick = { uri.openUri(a.page) }) { Text("Open web page") }
                     if (client is QbitClient && !a.read) TextButton(onClick = { pick = null; run("Marked as read", { feeds.load(true) }) { rss.rssMarkRead(null, a) } }) { Text("Mark as read") }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { pick = null; run("Sent to ${cfg.name}", { feeds.load(true) }) { rss.rssDownload(a); if (client is QbitClient) rss.rssMarkRead(null, a) } }) {
+                TextButton(onClick = { pick = null; download(listOf(a), null) }) {
                     Text("Download", color = Good, fontWeight = FontWeight.Bold)
                 }
             },
@@ -195,6 +250,47 @@ private fun ArticlesView(
         )
     }
     sendTo?.let { a -> SendLinkDialog(a.torrentUrl) { sendTo = null } }
+    catTarget?.let { list ->
+        CategoryPicker(client, list.size, onDismiss = { catTarget = null }) { cat -> catTarget = null; download(list, cat) }
+    }
+}
+
+/** Choose (or create) the category / label to download RSS articles into. */
+@Composable
+private fun CategoryPicker(client: DownloadClient, count: Int, onDismiss: () -> Unit, onPick: (String?) -> Unit) {
+    val cats = rememberLoadable(client.cfg, "rsscats") { client.categories() }
+    val run = rememberRunner()
+    var newName by remember { mutableStateOf("") }
+    var newPath by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (count == 1) "Download to category" else "Download $count to category") },
+        text = {
+            Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
+                Row(Modifier.fillMaxWidth().clickable { onPick(null) }.padding(vertical = 10.dp, horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    StatusDot(MaterialTheme.colorScheme.onSurfaceVariant, 10.dp); Spacer(Modifier.width(10.dp)); Text("No category")
+                }
+                val list = cats.data
+                if (list == null) Text("Loading categories…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else list.forEachIndexed { i, c ->
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onPick(c) }.padding(vertical = 10.dp, horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        StatusDot(Rainbow[i % Rainbow.size], 10.dp); Spacer(Modifier.width(10.dp)); Text(c, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Text("New category", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                OutlinedTextField(newName, { newName = it }, singleLine = true, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
+                if (client is QbitClient) OutlinedTextField(newPath, { newPath = it }, singleLine = true, label = { Text("Save path (optional)") }, modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = newName.isNotBlank(), onClick = {
+                val n = newName.trim(); val p = newPath.trim()
+                run(null, { onPick(n) }) { client.createCategory(n, p) }
+            }) { Text("Create & download") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 // ------------------------------------------------------------ feeds

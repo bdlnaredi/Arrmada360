@@ -3,6 +3,25 @@
 </p>
 
 <p align="center">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/sonarr.png" alt="Sonarr" title="Sonarr" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/radarr.png" alt="Radarr" title="Radarr" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/lidarr.png" alt="Lidarr" title="Lidarr" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/readarr.png" alt="Readarr" title="Readarr" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/prowlarr.png" alt="Prowlarr" title="Prowlarr" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/jackett.png" alt="Jackett" title="Jackett" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/qbittorrent.png" alt="qBittorrent" title="qBittorrent" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/transmission.png" alt="Transmission" title="Transmission" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/deluge.png" alt="Deluge" title="Deluge" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/rutorrent.png" alt="ruTorrent" title="ruTorrent" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/sabnzbd.png" alt="SABnzbd" title="SABnzbd" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/nzbget.png" alt="NZBGet" title="NZBGet" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/overseerr.png" alt="Overseerr" title="Overseerr" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/jellyseerr.png" alt="Jellyseerr" title="Jellyseerr" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/tautulli.png" alt="Tautulli" title="Tautulli" width="48" height="48">
+  <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/unraid.png" alt="Unraid" title="Unraid" width="48" height="48">
+</p>
+
+<p align="center">
   <a href="../../releases/latest"><img alt="Download APK" src="https://img.shields.io/badge/Download-APK-35C5F4?style=for-the-badge&logo=android&logoColor=white"></a>
   <a href="../../actions/workflows/build.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/bdlnaredi/Arrmada360/build.yml?style=for-the-badge&label=build"></a>
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-4ADE80?style=for-the-badge">
@@ -17,7 +36,8 @@ One app covers Sonarr, Radarr, Lidarr, Readarr, Prowlarr, Jackett, qBittorrent, 
 **Every feature is unlocked.** There are no subscriptions, no "pro" tiers and no ads. The app only talks to your own servers and to the discovery sources you choose to add.
 
 > [!NOTE]
-> The images below are **design previews** drawn from the app's real layout and colours. They are not captures from a phone.
+> The app logos on this page are the official icons, loaded from the open-source [dashboard-icons](https://github.com/homarr-labs/dashboard-icons) project (the same files the app shows).
+> The screen images below are **design previews** drawn from the app's real layout and colours. They are not captures from a phone, so the logo tiles in them show initials.
 > To swap in real screenshots, take them on your phone and overwrite the files in [`docs/screenshots/`](docs/screenshots), keeping the same file names.
 
 ---
@@ -66,7 +86,7 @@ One app covers Sonarr, Radarr, Lidarr, Readarr, Prowlarr, Jackett, qBittorrent, 
 
 Every app gets its own colour theme, its official logo and its own bottom tab bar.
 
-### 📺 Sonarr · 🎬 Radarr · 🎵 Lidarr · 📚 Readarr
+### <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/sonarr.png" width="28"> <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/radarr.png" width="28"> <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/lidarr.png" width="28"> <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/readarr.png" width="28"> Sonarr · Radarr · Lidarr · Readarr
 
 Bottom tabs: **Library · Queue · Add · History · Server**
 
@@ -86,7 +106,7 @@ Bottom tabs: **Library · Queue · Add · History · Server**
   - **RSS sync**, **Update library**, **Search all missing** and **Refresh downloads**
   - **System status:** version, health warnings, disk space, scheduled tasks you can run now, and restart
 
-### 🔎 Prowlarr · Jackett
+### <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/prowlarr.png" width="28"> <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/jackett.png" width="28"> Prowlarr · Jackett
 
 - **Search** every indexer, with category chips (Movies, TV, Music, Books, Anime, PC) and sorting by seeders, size, newest or title.
 - Send any result to **any download client you've added**, use *Grab with Prowlarr's own client*, copy the magnet link or open the details page.
@@ -96,7 +116,7 @@ Bottom tabs: **Library · Queue · Add · History · Server**
   - **History**
   - **Server:** status, health and tasks
 
-### ⬇️ qBittorrent · Transmission · Deluge · ruTorrent · SABnzbd · NZBGet
+### <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/qbittorrent.png" width="28"> <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/transmission.png" width="28"> <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/deluge.png" width="28"> <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/rutorrent.png" width="28"> <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/sabnzbd.png" width="28"> <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/nzbget.png" width="28"> qBittorrent · Transmission · Deluge · ruTorrent · SABnzbd · NZBGet
 
 Bottom tabs: **Torrents (or Queue + History) · RSS · Server**
 
@@ -110,6 +130,8 @@ Bottom tabs: **Torrents (or Queue + History) · RSS · Server**
 - **Add** a torrent or NZB by magnet link or URL, or share a magnet link to Arrmada360 from any other app.
 - **RSS** (qBittorrent and ruTorrent):
   - **Articles** from every feed: search, filter by feed, unread only, one-tap download, send to another client, read the description, mark as read
+  - **Multi-select** articles (long-press or the checklist button), then download them all, mark them read, or **download them into a category**
+  - **Download to a category** for any article: pick an existing category or label, or create a new one (with a save path on qBittorrent)
   - **Feeds:** add, refresh and remove, with error status
   - **Auto-download rules** (qBittorrent): must contain / must not contain, regex, episode filter, category, save path and feeds, plus a **preview of matching articles**
   - switches for the qBittorrent RSS reader and auto-download
@@ -119,20 +141,20 @@ Bottom tabs: **Torrents (or Queue + History) · RSS · Server**
   - SABnzbd speed limits
   - Usenet history
 
-### 🙋 Overseerr / Jellyseerr
+### <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/overseerr.png" width="28"> <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/jellyseerr.png" width="28"> Overseerr / Jellyseerr
 
 - **Requests:** filter by pending, approved, processing, available or all. Approve, decline, retry or delete.
 - **Discover:** trending, popular movies, popular TV and upcoming, plus search. You can request titles, including 4K.
 - **Users:** request counts per user.
 - **Server:** version and update status, and jobs you can run now.
 
-### 📊 Tautulli
+### <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/tautulli.png" width="28"> Tautulli
 
 - **Activity:** live streams with progress, direct play or transcode, quality, location and bandwidth. You can **stop a stream** and show the viewer a message.
 - **History**, **Stats** (most watched, most active users, platforms, last 30 days) and **Users**.
 - **Server:** Plex server info and libraries.
 
-### 🖥️ Unraid (7.2+ official API)
+### <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/unraid.png" width="28"> Unraid (7.2+ official API)
 
 Bottom tabs: **Dashboard · Array · Docker · VMs · Shares**
 
