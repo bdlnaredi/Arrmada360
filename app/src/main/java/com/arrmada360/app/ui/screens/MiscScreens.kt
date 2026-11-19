@@ -122,7 +122,7 @@ private fun RequestsTab(api: SeerrApi) {
                             Poster(r.poster, Modifier.width(64.dp), fallback = r.title)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(r.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(r.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
                                 Text("${if (r.type == "tv") "TV" else "Movie"}${if (r.is4k) " · 4K" else ""}${if (r.seasons.isNotEmpty()) " · " + r.seasons else ""}",
                                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                                 Text("by ${r.requestedBy} · ${fmtDate(r.created)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -178,7 +178,7 @@ private fun DiscoverTab(api: SeerrApi) {
                                 Pill(when (m.status) { 5 -> "Available"; 4 -> "Partial"; 3 -> "Processing"; else -> "Requested" }, if (m.status >= 4) Good else Warn)
                             }
                         }
-                        Text(m.title, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(m.title, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
                         Text("${m.year} · ${if (m.mediaType == "tv") "TV" else "Movie"}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -261,7 +261,7 @@ private fun ActivityTab(api: TautulliApi) {
                         Poster(s.thumb, Modifier.width(64.dp), fallback = s.title)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(s.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(s.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
                             Text(s.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text("${s.user} · ${s.player}", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                             Spacer(Modifier.height(4.dp))

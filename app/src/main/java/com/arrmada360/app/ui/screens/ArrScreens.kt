@@ -288,7 +288,7 @@ private fun PosterTile(m: MediaItem, onClick: () -> Unit) {
             }
         }
         Spacer(Modifier.height(5.dp))
-        Text(m.title, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+        Text(m.title, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = Color.White)
         if (m.year > 0) Text(m.year.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }
@@ -330,7 +330,7 @@ private fun CalRow(e: CalEntry, onClick: () -> Unit, trailing: @Composable () ->
         Poster(e.poster, Modifier.width(48.dp), corner = 8.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(e.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(e.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = Color.White)
             Text(e.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(3.dp))
             Pill(fmtDate(e.date, withTime = e.date.length > 10).ifEmpty { "TBA" }, if (e.hasFile) Good else MaterialTheme.colorScheme.primary)
@@ -350,7 +350,7 @@ private fun QueueTab(api: ArrApi) {
             items(list, key = { it.id }) { q ->
                 Panel(Modifier.fillMaxWidth(), onClick = { selected = q }) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(q.subtitle.ifEmpty { q.title }, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(q.subtitle.ifEmpty { q.title }, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = Color.White)
                         if (q.subtitle.isNotEmpty()) Text(q.title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Spacer(Modifier.height(8.dp))
                         val p = if (q.size > 0) 1f - q.sizeLeft.toFloat() / q.size else 0f
@@ -452,7 +452,7 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                             Poster(m.poster, Modifier.width(100.dp), ratio = if (cfg.type == ServiceType.LIDARR) 1f else 2f / 3f, fallback = m.title)
                             Spacer(Modifier.width(14.dp))
                             Column {
-                                Text(m.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(m.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.ExtraBold, color = Color.White)
                                 Text(listOf(if (m.year > 0) m.year.toString() else "", m.network, m.status.replaceFirstChar { it.uppercase() })
                                     .filter { it.isNotEmpty() }.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(6.dp))
@@ -623,7 +623,7 @@ private fun GroupHeader(
             Icon(if (mon) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder, "Monitor", tint = if (mon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.titleSmall)
+            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
             Text("$have / ${children.size}", style = MaterialTheme.typography.labelSmall, color = if (have == children.size && have > 0) Good else MaterialTheme.colorScheme.onSurfaceVariant)
         }
         IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, "Search") }
@@ -641,7 +641,7 @@ private fun ChildRow(c: ChildItem, onMonitor: () -> Unit, onSearch: () -> Unit, 
                 tint = if (c.monitored) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
         }
         Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
-            Text(c.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(c.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = Color.White)
             Text(fmtDate(c.subtitle.take(10)).ifEmpty { c.subtitle }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         val aired = parseDate(c.date)?.let { !it.isAfter(java.time.LocalDate.now()) } ?: false
@@ -751,7 +751,7 @@ fun ArrAddScreen(cfg: ServiceConfig, initialTerm: String, nav: Navigator, back: 
                                 Poster(m.poster, Modifier.width(70.dp), ratio = if (cfg.type == ServiceType.LIDARR) 1f else 2f / 3f, fallback = m.title)
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(m.title, style = MaterialTheme.typography.titleSmall)
+                                    Text(m.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
                                     Text(listOf(if (m.year > 0) m.year.toString() else "", m.network).filter { it.isNotEmpty() }.joinToString(" · "),
                                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     if (inLib) { Spacer(Modifier.height(4.dp)); Pill("In library", Good) }
@@ -805,7 +805,7 @@ private fun AddSheet(api: ArrApi, m: MediaItem, onDismiss: () -> Unit, onAdded: 
                 Poster(m.poster, Modifier.width(56.dp), ratio = if (api.type == ServiceType.LIDARR) 1f else 2f / 3f)
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text(m.title, style = MaterialTheme.typography.titleMedium)
+                    Text(m.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
                     if (m.year > 0) Text(m.year.toString(), style = MaterialTheme.typography.bodySmall)
                 }
             }

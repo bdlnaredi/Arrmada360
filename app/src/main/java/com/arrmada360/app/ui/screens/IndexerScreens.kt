@@ -263,7 +263,7 @@ private fun MediaRow(items: List<MediaItem>, onClick: (MediaItem) -> Unit) {
         items(items) { m ->
             Column(Modifier.width(104.dp).clickable { onClick(m) }) {
                 Poster(m.poster, Modifier.fillMaxWidth(), fallback = m.title)
-                Text(m.title, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(m.title, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
                 if (m.year > 0) Text(m.year.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

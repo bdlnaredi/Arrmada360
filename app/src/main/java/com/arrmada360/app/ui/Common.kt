@@ -194,7 +194,12 @@ fun AppBackground(modifier: Modifier = Modifier, content: @Composable () -> Unit
                 radius = w * 0.9f, center = Offset(w * 0.3f, h * (0.85f - 0.1f * drift)),
             )
         },
-    ) { content() }
+    ) {
+        // Make every plain Text light by default (a transparent background otherwise falls back to black).
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onBackground,
+        ) { content() }
+    }
 }
 
 
@@ -249,6 +254,7 @@ fun AppScaffold(
             },
             floatingActionButton = fab,
             containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onBackground,
             content = content,
         )
     }
