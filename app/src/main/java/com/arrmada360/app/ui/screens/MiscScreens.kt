@@ -72,6 +72,7 @@ import com.arrmada360.app.api.UnraidApi
 import com.arrmada360.app.api.UnraidArray
 import com.arrmada360.app.api.UnraidSystem
 import com.arrmada360.app.data.ServiceConfig
+import com.arrmada360.app.data.display
 import com.arrmada360.app.ui.AppScaffold
 import com.arrmada360.app.ui.BottomTab
 import com.arrmada360.app.ui.Bad
@@ -100,7 +101,7 @@ private val REQ_FILTERS = listOf("Pending" to "pending", "Approved" to "approved
 fun SeerrScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, isRoot: Boolean, back: () -> Unit) {
     val api = remember(cfg) { SeerrApi(cfg) }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
-    AppScaffold(title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
+    AppScaffold(title = cfg.display(), isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
         bottomTabs = listOf(
             BottomTab("Requests", Icons.Filled.Inbox), BottomTab("Discover", Icons.Filled.Explore),
             BottomTab("Users", Icons.Filled.People), BottomTab("Server", Icons.Filled.Dns),
@@ -227,7 +228,7 @@ private fun DiscoverTab(api: SeerrApi) {
 fun TautulliScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, isRoot: Boolean, back: () -> Unit) {
     val api = remember(cfg) { TautulliApi(cfg) }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
-    AppScaffold(title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
+    AppScaffold(title = cfg.display(), isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
         bottomTabs = listOf(
             BottomTab("Activity", Icons.Filled.PlayCircle), BottomTab("History", Icons.Filled.History),
             BottomTab("Stats", Icons.Filled.BarChart), BottomTab("Users", Icons.Filled.People), BottomTab("Server", Icons.Filled.Dns),
@@ -321,7 +322,7 @@ private fun ActivityTab(api: TautulliApi) {
 fun UnraidScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, isRoot: Boolean, back: () -> Unit) {
     val api = remember(cfg) { UnraidApi(cfg) }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
-    AppScaffold(title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
+    AppScaffold(title = cfg.display(), isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
         bottomTabs = listOf(
             BottomTab("Overview", Icons.Filled.Dashboard), BottomTab("Docker", Icons.Filled.ViewInAr),
             BottomTab("VMs", Icons.Filled.Computer), BottomTab("Server", Icons.Filled.Dns),

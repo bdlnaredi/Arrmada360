@@ -50,8 +50,42 @@ data class ServiceConfig(
     }
 }
 
+/** All on/off preferences with their defaults. */
+object Pref {
+    const val VOLUME_NAV = "volumeNav"
+    const val DRAWER_GESTURE = "drawerGesture"
+    const val SWIPE_DOWNLOADS = "swipeDownloads"
+    const val BACK_TO_DASHBOARD = "backToDashboard"
+    const val FRIENDLY_NAMES = "friendlyNames"
+    const val SPEED_BITS = "speedBits"
+    const val AUTO_CLEAR_SEARCH = "autoClearSearch"
+    const val WHATS_NEW = "whatsNew"
+    const val AUTH_SETTINGS = "authSettings"
+    const val CRASH_LOGS = "crashLogs"
+    const val NOTIFY = "notify"
+    const val NOTIFY_RADARR = "notify_RADARR"
+    const val NOTIFY_SONARR = "notify_SONARR"
+    const val NOTIFY_LIDARR = "notify_LIDARR"
+    const val NOTIFY_READARR = "notify_READARR"
+    const val NOTIFY_SEERR = "notify_SEERR"
+    const val NOTIFY_DOWNLOADS = "notify_DOWNLOADS"
+
+    val defaults: Map<String, Boolean> = mapOf(
+        VOLUME_NAV to false, DRAWER_GESTURE to true, SWIPE_DOWNLOADS to true, BACK_TO_DASHBOARD to true,
+        FRIENDLY_NAMES to false, SPEED_BITS to false, AUTO_CLEAR_SEARCH to true, WHATS_NEW to true,
+        AUTH_SETTINGS to false, CRASH_LOGS to true,
+        NOTIFY to false, NOTIFY_RADARR to true, NOTIFY_SONARR to true, NOTIFY_LIDARR to true,
+        NOTIFY_READARR to true, NOTIFY_SEERR to true, NOTIFY_DOWNLOADS to false,
+    )
+}
+
 object ConfigStore {
     private lateinit var prefs: SharedPreferences
+    private val flags = androidx.compose.runtime.mutableStateMapOf<String, Boolean>()
+    var imdbOpenWith by mutableStateOf("browser")
+        private set
+    /** Settings lock: unlocked for the rest of this app session once the user authenticates. */
+    var settingsUnlocked by mutableStateOf(false)
     val services = mutableStateListOf<ServiceConfig>()
     var onboarded by mutableStateOf(false)
         private set
@@ -71,6 +105,8 @@ object ConfigStore {
         amoled = prefs.getBoolean("amoled", false)
         gridColumns = prefs.getInt("gridColumns", 3)
         tmdbKey = prefs.getString("tmdbKey", "") ?: ""
+        Pref.defaults.forEach { (k, d) -> flags[k] = prefs.getBoolean(k, d) }
+        imdbOpenWith = prefs.getString("imdbOpenWith", "browser") ?: "browser"
         traktClientId = prefs.getString("traktClientId", "") ?: ""
         val arr = try { JSONArray(prefs.getString("services", "[]")) } catch (e: Exception) { JSONArray() }
         for (i in 0 until arr.length()) {
@@ -129,6 +165,55 @@ object ConfigStore {
         prefs.edit().putInt("gridColumns", gridColumns).apply()
     }
 
+    fun flag(key: String): Boolean = flags[key] ?: Pref.defaults[key] ?: false
+
+    fun setFlag(key: String, v: Boolean) {
+        flags[key] = v
+        prefs.edit().putBoolean(key, v).apply()
+    }
+
+    fun updateImdbOpenWith(v: String) {
+        imdbOpenWith = v
+        prefs.edit().putString("imdbOpenWith", v).apply()
+    }
+
+    fun getString(key: String, def: String = ""): String = prefs.getString(key, def) ?: def
+    fun putString(key: String, v: String) = prefs.edit().putString(key, v).apply()
+    fun getStringSet(key: String): Set<String> = prefs.getStringSet(key, emptySet()) ?: emptySet()
+    fun putStringSet(key: String, v: Set<String>) = prefs.edit().putStringSet(key, v).apply()
+    fun getInt(key: String, def: Int = 0): Int = prefs.getInt(key, def)
+    fun putInt(key: String, v: Int) = prefs.edit().putInt(key, v).apply()
+
+    /** Full backup: every service plus every preference. */
+    fun exportFullJson(): String {
+        val arr = JSONArray()
+        services.forEach { arr.put(it.toJson()) }
+        val p = JSONObject()
+        Pref.defaults.keys.forEach { p.put(it, flag(it)) }
+        return JSONObject()
+            .put("app", "Arrmada360").put("backupVersion", 2).put("services", arr).put("prefs", p)
+            .put("amoled", amoled).put("gridColumns", gridColumns)
+            .put("tmdbKey", tmdbKey).put("traktClientId", traktClientId).put("imdbOpenWith", imdbOpenWith)
+            .toString(2)
+    }
+
+    /** Replaces all current settings with the backup. Returns the number of services restored. */
+    fun restoreFullJson(text: String): Int {
+        val o = JSONObject(text)
+        val arr = o.getJSONArray("services")
+        val list = (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.let { j -> ServiceConfig.fromJson(j) } }
+        services.clear()
+        services.addAll(list)
+        save()
+        o.optJSONObject("prefs")?.let { p -> Pref.defaults.keys.forEach { k -> if (p.has(k)) setFlag(k, p.optBoolean(k)) } }
+        if (o.has("amoled")) updateAmoled(o.optBoolean("amoled"))
+        if (o.has("gridColumns")) updateGridColumns(o.optInt("gridColumns", 3))
+        if (o.has("tmdbKey") || o.has("traktClientId")) updateDiscoverKeys(o.optString("tmdbKey"), o.optString("traktClientId"))
+        if (o.has("imdbOpenWith")) updateImdbOpenWith(o.optString("imdbOpenWith", "browser"))
+        if (list.isNotEmpty()) finishOnboarding()
+        return list.size
+    }
+
     fun updateDiscoverKeys(tmdb: String, trakt: String) {
         tmdbKey = tmdb.trim()
         traktClientId = trakt.trim()
@@ -155,4 +240,21 @@ object ConfigStore {
         save()
         return n
     }
+}
+
+/** "Movies" instead of "Radarr" etc. when friendly names are on (and there's only one of that app). */
+fun ServiceConfig.display(): String {
+    if (!ConfigStore.flag(Pref.FRIENDLY_NAMES)) return name
+    if (ConfigStore.services.count { it.type == type } > 1) return name
+    return when (type) {
+        ServiceType.RADARR -> "Movies"; ServiceType.SONARR -> "TV Shows"; ServiceType.LIDARR -> "Music"; ServiceType.READARR -> "Books"
+        ServiceType.PROWLARR, ServiceType.JACKETT -> "Indexers"; ServiceType.SEERR -> "Requests"; ServiceType.TAUTULLI -> "Plex activity"
+        ServiceType.UNRAID -> "Server"; else -> "Downloads"
+    }
+}
+
+/** Simple app-wide events (volume keys, deep links). */
+object AppEvents {
+    val cycleService = kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 8)
+    val deepLink = kotlinx.coroutines.flow.MutableSharedFlow<android.net.Uri>(replay = 1, extraBufferCapacity = 4)
 }

@@ -59,6 +59,7 @@ import com.arrmada360.app.api.ProwlarrApi
 import com.arrmada360.app.api.SEARCH_CATEGORIES
 import com.arrmada360.app.data.ConfigStore
 import com.arrmada360.app.data.ServiceConfig
+import com.arrmada360.app.data.display
 import com.arrmada360.app.data.ServiceType
 import com.arrmada360.app.ui.AppScaffold
 import com.arrmada360.app.ui.Bad
@@ -93,7 +94,7 @@ fun IndexerScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () 
     val jackett = remember(cfg) { if (cfg.type == ServiceType.JACKETT) JackettApi(cfg) else null }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
     AppScaffold(
-        title = cfg.name, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
+        title = cfg.display(), isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
         bottomTabs = if (prowlarr != null) listOf(
             com.arrmada360.app.ui.BottomTab("Search", Icons.Filled.Search),
             com.arrmada360.app.ui.BottomTab("Indexers", androidx.compose.material.icons.Icons.Filled.Storage),

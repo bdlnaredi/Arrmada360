@@ -119,6 +119,10 @@ fun DashboardScreen(nav: Navigator) {
     val services = ConfigStore.services.toList()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var pick by rememberSaveable { mutableIntStateOf(0) }
+    val requested = com.arrmada360.app.ui.DashboardNav.tab
+    androidx.compose.runtime.LaunchedEffect(requested) {
+        if (requested != null) { tab = requested; pick = 0; com.arrmada360.app.ui.DashboardNav.tab = null }
+    }
     val radarrs = services.filter { it.type == ServiceType.RADARR }
     val sonarrs = services.filter { it.type == ServiceType.SONARR }
     val instances = when (tab) { 1 -> radarrs; 2 -> sonarrs; else -> emptyList() }
@@ -477,138 +481,3 @@ private fun ServerHome(services: List<ServiceConfig>, nav: Navigator) {
     }
 }
 
-@Composable
-private fun DiscoveryKeys() {
-    val ctx = LocalContext.current
-    var tmdb by remember { mutableStateOf(ConfigStore.tmdbKey) }
-    var trakt by remember { mutableStateOf(ConfigStore.traktClientId) }
-    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            "Rows use Trakt first, then TMDB, then your Overseerr/Jellyseerr. Seerr works with no key; add free keys for more rows (popular people needs TMDB or Seerr).",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        OutlinedTextField(tmdb, { tmdb = it }, label = { Text("TMDB API key or read access token") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-            supportingText = { Text("themoviedb.org → Settings → API (free)") })
-        OutlinedTextField(trakt, { trakt = it }, label = { Text("Trakt Client ID") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-            supportingText = { Text("trakt.tv/oauth/applications → New application → Client ID (free)") })
-        GradientButton("Save discovery keys", Modifier.fillMaxWidth()) {
-            ConfigStore.updateDiscoverKeys(tmdb, trakt)
-            ctx.toast("Saved – Movies & TV tabs will refresh")
-        }
-    }
-}
-
-// ============================================================ Settings
-@Composable
-fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
-    val ctx = LocalContext.current
-    var confirmDelete by remember { mutableStateOf<ServiceConfig?>(null) }
-    var importOpen by remember { mutableStateOf(false) }
-    AppScaffold(title = "Settings", isRoot = isRoot, onBack = back) { pad ->
-        LazyColumn(Modifier.padding(pad), contentPadding = PaddingValues(bottom = 40.dp)) {
-            item { SectionTitle("Services") }
-            item {
-                GradientButton("Test all connections", Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth()) { nav.push(Route.Health) }
-            }
-            items(ConfigStore.services.toList(), key = { it.id }) { c ->
-                Row(Modifier.fillMaxWidth().clickable { nav.push(Route.EditService(c.id, null)) }.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    ServiceBadge(c.type, 32.dp)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(c.name)
-                        Text(c.baseUrl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    IconButton(onClick = { ConfigStore.move(c.id, -1) }) { Icon(Icons.Filled.KeyboardArrowUp, "Move up") }
-                    IconButton(onClick = { ConfigStore.move(c.id, 1) }) { Icon(Icons.Filled.KeyboardArrowDown, "Move down") }
-                    IconButton(onClick = { nav.push(Route.EditService(c.id, null)) }) { Icon(Icons.Filled.Edit, "Edit") }
-                    IconButton(onClick = { confirmDelete = c }) { Icon(Icons.Filled.Delete, "Delete") }
-                }
-            }
-            item {
-                TextButton(onClick = { nav.push(Route.AddService) }, modifier = Modifier.padding(horizontal = 8.dp)) {
-                    Icon(Icons.Filled.Add, null); Spacer(Modifier.width(6.dp)); Text("Add service")
-                }
-            }
-            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { SectionTitle("Discovery (Movies & TV Shows tabs)") }
-            item { DiscoveryKeys() }
-            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { SectionTitle("Appearance") }
-            item {
-                Row(Modifier.fillMaxWidth().clickable { ConfigStore.updateAmoled(!ConfigStore.amoled) }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("AMOLED black")
-                        Text("Pure black background to save battery", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(ConfigStore.amoled, { ConfigStore.updateAmoled(it) })
-                }
-            }
-            item {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    Text("Poster columns: ${ConfigStore.gridColumns}")
-                    Slider(value = ConfigStore.gridColumns.toFloat(), onValueChange = { ConfigStore.updateGridColumns(Math.round(it)) }, valueRange = 2f..5f, steps = 2)
-                }
-            }
-            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { SectionTitle("Backup") }
-            item {
-                Row(Modifier.padding(horizontal = 8.dp)) {
-                    TextButton(onClick = {
-                        val text = ConfigStore.exportJson()
-                        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
-                        ctx.startActivity(Intent.createChooser(send, "Export Arrmada360 settings"))
-                    }) { Text("Export / share") }
-                    TextButton(onClick = { ctx.copyText(ConfigStore.exportJson()) }) { Text("Copy") }
-                    TextButton(onClick = { importOpen = true }) { Text("Import") }
-                }
-            }
-            item {
-                Text("Exports contain your API keys and passwords – keep them private.", style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
-            }
-            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
-            item { SectionTitle("About") }
-            item {
-                Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Arrmada360", fontWeight = FontWeight.SemiBold)
-                    Text("Free and open source. Every feature unlocked – no subscriptions, no paywalls.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    TextButton(onClick = { ConfigStore.resetOnboarding() }) { Text("Run first-time setup again") }
-                }
-            }
-        }
-    }
-
-    confirmDelete?.let { c ->
-        AlertDialog(
-            onDismissRequest = { confirmDelete = null },
-            title = { Text("Remove ${c.name}?") },
-            text = { Text("This only removes it from Arrmada360. Nothing changes on your server.") },
-            confirmButton = { TextButton(onClick = { ConfigStore.remove(c.id); confirmDelete = null }) { Text("Remove", color = Bad) } },
-            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancel") } },
-        )
-    }
-
-    if (importOpen) {
-        var text by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { importOpen = false },
-            title = { Text("Import settings") },
-            text = { OutlinedTextField(text, { text = it }, label = { Text("Paste exported JSON") }, minLines = 4, maxLines = 8) },
-            confirmButton = {
-                TextButton(onClick = {
-                    try {
-                        val n = ConfigStore.importJson(text)
-                        ctx.toast("Imported $n services")
-                        importOpen = false
-                    } catch (e: Exception) {
-                        ctx.toast("That doesn't look like an Arrmada360 export")
-                    }
-                }) { Text("Import") }
-            },
-            dismissButton = { TextButton(onClick = { importOpen = false }) { Text("Cancel") } },
-        )
-    }
-}
-
-@Suppress("unused")
-private fun unusedRefs() = listOf(fmtDate(""), Warn)

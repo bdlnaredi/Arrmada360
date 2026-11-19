@@ -23,6 +23,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.arrmada360.app.api.Conn
+import com.arrmada360.app.data.display
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import com.arrmada360.app.api.Connections
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
@@ -77,6 +80,18 @@ sealed interface Route {
     data object Health : Route
     data class ArrSystem(val serviceId: String) : Route
     data class ManualImport(val serviceId: String) : Route
+    data object SettingsGeneral : Route
+    data object SettingsGestures : Route
+    data object SettingsBackup : Route
+    data object SettingsNotifications : Route
+    data object SettingsDeepLinks : Route
+    data object SettingsAppearance : Route
+    data object SettingsDiscovery : Route
+}
+
+/** Lets deep links pick a dashboard bottom tab. */
+object DashboardNav {
+    var tab by androidx.compose.runtime.mutableStateOf<Int?>(null)
 }
 
 class Navigator {
@@ -93,7 +108,7 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    BackHandler(enabled = drawer.isOpen || nav.stack.size > 1 || nav.current != Route.Dashboard) {
+    BackHandler(enabled = drawer.isOpen || nav.stack.size > 1 || (nav.current != Route.Dashboard && ConfigStore.flag(com.arrmada360.app.data.Pref.BACK_TO_DASHBOARD))) {
         when {
             drawer.isOpen -> scope.launch { drawer.close() }
             nav.stack.size > 1 -> nav.pop()
@@ -103,10 +118,42 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
 
     val current = nav.current
     androidx.compose.runtime.LaunchedEffect(ConfigStore.services.size) { Connections.checkAll() }
+    // Volume rocker: cycle through apps
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        com.arrmada360.app.data.AppEvents.cycleService.collect { d ->
+            val list = ConfigStore.services.toList()
+            if (list.isEmpty()) return@collect
+            val cur = (nav.current as? Route.Service)?.id
+            val idx = list.indexOfFirst { it.id == cur }
+            val next = if (idx < 0) (if (d > 0) 0 else list.size - 1) else ((idx + d) % list.size + list.size) % list.size
+            nav.root(Route.Service(list[next].id))
+        }
+    }
+    // Deep links: arrmada360://service/<name or id>, arrmada360://movies …
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        com.arrmada360.app.data.AppEvents.deepLink.collect { uri ->
+            when (uri.host) {
+                "service" -> {
+                    val key = uri.pathSegments.firstOrNull() ?: ""
+                    ConfigStore.services.firstOrNull { it.id == key || it.name.equals(key, true) || it.type.name.equals(key, true) }
+                        ?.let { nav.root(Route.Service(it.id)) }
+                }
+                "movies" -> { DashboardNav.tab = 1; nav.root(Route.Dashboard) }
+                "tv" -> { DashboardNav.tab = 2; nav.root(Route.Dashboard) }
+                "calendar" -> { DashboardNav.tab = 3; nav.root(Route.Dashboard) }
+                "search" -> nav.root(Route.Search())
+                "health" -> nav.root(Route.Health)
+                "settings" -> nav.root(Route.Settings)
+                else -> { DashboardNav.tab = 0; nav.root(Route.Dashboard) }
+            }
+            com.arrmada360.app.data.AppEvents.deepLink.resetReplayCache()
+        }
+    }
+    com.arrmada360.app.ui.screens.WhatsNewGate()
     CompositionLocalProvider(LocalOpenDrawer provides { scope.launch { drawer.open() } }) {
         ModalNavigationDrawer(
             drawerState = drawer,
-            gesturesEnabled = nav.stack.size == 1,
+            gesturesEnabled = (nav.stack.size == 1 && ConfigStore.flag(com.arrmada360.app.data.Pref.DRAWER_GESTURE)) || drawer.isOpen,
             drawerContent = {
                 DrawerContent(current) { r ->
                     nav.root(r)
@@ -131,7 +178,14 @@ private fun RouteContent(r: Route, nav: Navigator) {
     val isRoot = nav.stack.size == 1
     when (r) {
         Route.Dashboard -> DashboardScreen(nav)
-        Route.Settings -> SettingsScreen(nav, isRoot, back)
+        Route.Settings -> com.arrmada360.app.ui.screens.SettingsGate(back) { SettingsScreen(nav, isRoot, back) }
+        Route.SettingsGeneral -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.GeneralSettingsScreen(nav, back) }
+        Route.SettingsGestures -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.GestureSettingsScreen(back) }
+        Route.SettingsBackup -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.BackupScreen(back) }
+        Route.SettingsNotifications -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.NotificationsScreen(nav, back) }
+        Route.SettingsDeepLinks -> com.arrmada360.app.ui.screens.DeepLinksScreen(back)
+        Route.SettingsAppearance -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.AppearanceScreen(back) }
+        Route.SettingsDiscovery -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.DiscoverySettingsScreen(back) }
         Route.Health -> com.arrmada360.app.ui.screens.HealthScreen(nav, isRoot, back)
         Route.AddService -> ServicePickerScreen(
             title = "Add a service", subtitle = "Pick an app to connect",
@@ -221,7 +275,7 @@ private fun DrawerContent(current: Route, go: (Route) -> Unit) {
                         list.forEach { s ->
                             val st = Connections.of(s.id)
                             NavigationDrawerItem(
-                                label = { Text(s.name, fontWeight = FontWeight.Medium) },
+                                label = { Text(s.display(), fontWeight = FontWeight.Medium) },
                                 selected = (current as? Route.Service)?.id == s.id,
                                 icon = { ServiceBadge(s.type, 32.dp, s.name) },
                                 badge = {

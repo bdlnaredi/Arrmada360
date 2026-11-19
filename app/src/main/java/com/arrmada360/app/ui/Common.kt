@@ -671,7 +671,18 @@ fun humanBytes(b: Long): String {
     return String.format(Locale.US, if (v >= 100) "%.0f %s" else "%.1f %s", v, units[i])
 }
 
-fun humanSpeed(bps: Long): String = if (bps <= 0) "0 B/s" else humanBytes(bps) + "/s"
+fun humanSpeed(bps: Long): String {
+    if (com.arrmada360.app.data.ConfigStore.flag(com.arrmada360.app.data.Pref.SPEED_BITS)) {
+        if (bps <= 0) return "0 bps"
+        val bits = bps * 8.0
+        val units = listOf("bps", "Kbps", "Mbps", "Gbps")
+        var v = bits
+        var i = 0
+        while (v >= 1000 && i < units.size - 1) { v /= 1000; i++ }
+        return String.format(Locale.US, if (v >= 100) "%.0f %s" else "%.1f %s", v, units[i])
+    }
+    return if (bps <= 0) "0 B/s" else humanBytes(bps) + "/s"
+}
 
 fun humanEta(sec: Long): String {
     if (sec < 0) return "∞"

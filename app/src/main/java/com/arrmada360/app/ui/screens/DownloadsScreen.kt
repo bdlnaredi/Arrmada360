@@ -408,6 +408,10 @@ private fun SwipeRow(paused: Boolean, modifier: Modifier, onSwipeRight: () -> Un
             false
         },
     )
+    if (!com.arrmada360.app.data.ConfigStore.flag(com.arrmada360.app.data.Pref.SWIPE_DOWNLOADS)) {
+        Box(modifier) { content() }
+        return
+    }
     SwipeToDismissBox(
         state = state,
         modifier = modifier,

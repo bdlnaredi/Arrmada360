@@ -103,6 +103,7 @@ import com.arrmada360.app.api.ReleaseEntry
 import com.arrmada360.app.api.RootFolder
 import com.arrmada360.app.data.ConfigStore
 import com.arrmada360.app.data.ServiceConfig
+import com.arrmada360.app.data.display
 import com.arrmada360.app.data.ServiceType
 import com.arrmada360.app.ui.AppScaffold
 import com.arrmada360.app.ui.BottomTab
@@ -152,7 +153,7 @@ fun ArrScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () -> U
     val run = rememberRunner()
 
     AppScaffold(
-        title = cfg.name, subtitle = bottom[tab].label, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
+        title = cfg.display(), subtitle = bottom[tab].label, isRoot = isRoot, onBack = back, badge = cfg.type, badgeName = cfg.name,
         tabs = if (tab == 0) listOf(libWord, "Calendar", "Missing") else emptyList(), selectedTab = libView, onTab = { libView = it },
         bottomTabs = bottom, selectedBottom = tab, onBottom = { tab = it },
         actions = {
@@ -245,7 +246,7 @@ fun ArrServerTab(api: ArrApi, nav: Navigator) {
 @Composable
 fun ArrSystemScreen(cfg: ServiceConfig, back: () -> Unit) {
     val api = remember(cfg) { ArrApi(cfg) }
-    AppScaffold(title = "System status", subtitle = cfg.name, isRoot = false, onBack = back, badge = cfg.type, badgeName = cfg.name) { pad ->
+    AppScaffold(title = "System status", subtitle = cfg.display(), isRoot = false, onBack = back, badge = cfg.type, badgeName = cfg.name) { pad ->
         Box(Modifier.padding(pad)) { ArrSystemContent(api) }
     }
 }
@@ -428,7 +429,7 @@ fun LibraryTab(api: ArrApi, nav: Navigator) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                items(shown, key = { it.id }) { m -> PosterTile(m) { nav.push(Route.ArrDetail(api.cfg.id, m.id)) } }
+                items(shown, key = { it.id }) { m -> PosterTile(m) { if (ConfigStore.flag(com.arrmada360.app.data.Pref.AUTO_CLEAR_SEARCH)) query = ""; nav.push(Route.ArrDetail(api.cfg.id, m.id)) } }
             }
         }
     }
@@ -673,6 +674,13 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                             InfoLine("Type", m.raw.optString("seriesType"))
                             InfoLine("Next airing", fmtDate(m.raw.optString("nextAiring"), true))
                         }
+                        val imdb = m.raw.optString("imdbId")
+                        if (imdb.startsWith("tt")) {
+                            val ctx = androidx.compose.ui.platform.LocalContext.current
+                            androidx.compose.material3.OutlinedButton(onClick = { openImdb(ctx, imdb) }, modifier = Modifier.padding(top = 8.dp)) {
+                                Text("Open on IMDb", color = Warn, fontWeight = FontWeight.Bold)
+                            }
+                        }
                         val genres = m.raw.optJSONArray("genres")
                         if (genres != null && genres.length() > 0) InfoLine("Genres", (0 until genres.length()).joinToString { genres.optString(it) })
                     }
@@ -901,7 +909,7 @@ private fun ReleaseRow(r: ReleaseEntry, onGrab: () -> Unit) {
 @Composable
 fun ArrAddScreen(cfg: ServiceConfig, initialTerm: String, nav: Navigator, back: () -> Unit) {
     val api = remember(cfg) { ArrApi(cfg) }
-    AppScaffold(title = "Add ${api.itemWord.lowercase()}", subtitle = cfg.name, isRoot = false, onBack = back) { pad ->
+    AppScaffold(title = "Add ${api.itemWord.lowercase()}", subtitle = cfg.display(), isRoot = false, onBack = back) { pad ->
         Box(Modifier.padding(pad)) {
             ArrAddContent(cfg, initialTerm, nav) { newId ->
                 nav.pop()
@@ -1031,4 +1039,14 @@ private fun AddSheet(api: ArrApi, m: MediaItem, onDismiss: () -> Unit, onAdded: 
             }
         }
     }
+}
+
+/** Opens an IMDb title in the IMDb app or the browser, per General settings. */
+fun openImdb(ctx: android.content.Context, imdbId: String) {
+    val web = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.imdb.com/title/$imdbId/"))
+    if (ConfigStore.imdbOpenWith == "app") {
+        val app = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("imdb:///title/$imdbId/"))
+        try { ctx.startActivity(app); return } catch (e: Exception) { /* app not installed */ }
+    }
+    try { ctx.startActivity(web) } catch (e: Exception) { }
 }

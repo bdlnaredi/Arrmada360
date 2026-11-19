@@ -77,6 +77,8 @@ object DownloadClients {
         }?.also { cache[cfg] = it }
     }
 
+    fun clearCache() = synchronized(cache) { cache.clear() }
+
     /** Snapshot + record speeds for the live charts. */
     suspend fun snapshot(c: DownloadClient): DlSnapshot {
         val s = c.snapshot()

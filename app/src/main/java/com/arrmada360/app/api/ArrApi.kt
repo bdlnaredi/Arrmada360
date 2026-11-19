@@ -75,7 +75,7 @@ data class QueueEntry(
     val downloadId: String = "",
 )
 
-data class HistoryEntry(val title: String, val event: String, val date: String, val quality: String)
+data class HistoryEntry(val title: String, val event: String, val date: String, val quality: String, val parentTitle: String = "", val detail: String = "")
 
 data class ReleaseEntry(
     val guid: String,
@@ -472,6 +472,9 @@ class ArrApi(val cfg: ServiceConfig) {
                 event = ev.replace(Regex("([a-z])([A-Z])"), "$1 $2").replaceFirstChar { it.uppercase() },
                 date = o.str("date"),
                 quality = o.obj("quality")?.obj("quality")?.str("name") ?: "",
+                parentTitle = o.obj(parentKey)?.let { p -> p.str("title").ifEmpty { p.str("artistName") }.ifEmpty { p.str("authorName") } } ?: "",
+                detail = (o.obj("episode")?.let { e -> "S%02dE%02d · %s".format(e.int("seasonNumber"), e.int("episodeNumber"), e.str("title")) }
+                    ?: o.obj("album")?.str("title") ?: o.obj("book")?.str("title") ?: ""),
             )
         }
     }

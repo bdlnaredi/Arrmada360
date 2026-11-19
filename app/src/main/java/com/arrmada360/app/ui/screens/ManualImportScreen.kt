@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import com.arrmada360.app.api.ArrApi
 import com.arrmada360.app.api.ImportItem
 import com.arrmada360.app.data.ServiceConfig
+import com.arrmada360.app.data.display
 import com.arrmada360.app.ui.AppScaffold
 import com.arrmada360.app.ui.Bad
 import com.arrmada360.app.ui.ChipRow
@@ -65,7 +66,7 @@ fun ManualImportScreen(cfg: ServiceConfig, back: () -> Unit) {
     var source by remember { mutableStateOf<ImportSource?>(null) }
     var folder by remember { mutableStateOf("") }
 
-    AppScaffold(title = "Manual import", subtitle = cfg.name, isRoot = false, onBack = { if (source != null) source = null else back() }, badge = cfg.type, badgeName = cfg.name) { pad ->
+    AppScaffold(title = "Manual import", subtitle = cfg.display(), isRoot = false, onBack = { if (source != null) source = null else back() }, badge = cfg.type, badgeName = cfg.name) { pad ->
         Box(Modifier.padding(pad).imePadding()) {
             val s = source
             if (s == null) {
