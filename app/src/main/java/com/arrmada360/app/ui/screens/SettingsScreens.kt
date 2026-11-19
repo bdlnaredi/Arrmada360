@@ -98,6 +98,7 @@ import com.arrmada360.app.ui.Good
 import com.arrmada360.app.ui.GradientButton
 import com.arrmada360.app.ui.Navigator
 import com.arrmada360.app.ui.Pink
+import com.arrmada360.app.ui.Pill
 import com.arrmada360.app.ui.Rainbow
 import com.arrmada360.app.ui.Route
 import com.arrmada360.app.ui.ServiceBadge
