@@ -197,7 +197,6 @@ fun AppBackground(modifier: Modifier = Modifier, content: @Composable () -> Unit
     ) { content() }
 }
 
-fun gradientOf(vararg c: Color): Brush = Brush.linearGradient(c.toList())
 
 // ------------------------------------------------------------------ navigation shell
 val LocalOpenDrawer = staticCompositionLocalOf<() -> Unit> { {} }
