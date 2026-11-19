@@ -151,8 +151,8 @@ fun DashboardScreen(nav: Navigator) {
                 when (tab) {
                     1, 2 -> {
                         val c = instances.getOrNull(pick.coerceAtMost((instances.size - 1).coerceAtLeast(0)))
-                        if (c == null) com.arrmada360.app.ui.EmptyBox(if (tab == 1) "Add Radarr in Settings to see your movies here" else "Add Sonarr in Settings to see your TV shows here")
-                        else ServiceTheme(c.type, ConfigStore.amoled) { LibraryTab(remember(c) { ArrApi(c) }, nav) }
+                        if (c != null) ServiceTheme(c.type, ConfigStore.amoled) { DiscoverTab(tab == 1, c, nav) }
+                        else DiscoverTab(tab == 1, null, nav)
                     }
                     3 -> CombinedCalendar(services.filter { it.type.isArr }, nav)
                     else -> ServerHome(services, nav)
@@ -477,6 +477,27 @@ private fun ServerHome(services: List<ServiceConfig>, nav: Navigator) {
     }
 }
 
+@Composable
+private fun DiscoveryKeys() {
+    val ctx = LocalContext.current
+    var tmdb by remember { mutableStateOf(ConfigStore.tmdbKey) }
+    var trakt by remember { mutableStateOf(ConfigStore.traktClientId) }
+    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            "Rows use Trakt first, then TMDB, then your Overseerr/Jellyseerr. Seerr works with no key; add free keys for more rows (popular people needs TMDB or Seerr).",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(tmdb, { tmdb = it }, label = { Text("TMDB API key or read access token") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            supportingText = { Text("themoviedb.org → Settings → API (free)") })
+        OutlinedTextField(trakt, { trakt = it }, label = { Text("Trakt Client ID") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            supportingText = { Text("trakt.tv/oauth/applications → New application → Client ID (free)") })
+        GradientButton("Save discovery keys", Modifier.fillMaxWidth()) {
+            ConfigStore.updateDiscoverKeys(tmdb, trakt)
+            ctx.toast("Saved – Movies & TV tabs will refresh")
+        }
+    }
+}
+
 // ============================================================ Settings
 @Composable
 fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
@@ -508,6 +529,9 @@ fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
                     Icon(Icons.Filled.Add, null); Spacer(Modifier.width(6.dp)); Text("Add service")
                 }
             }
+            item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+            item { SectionTitle("Discovery (Movies & TV Shows tabs)") }
+            item { DiscoveryKeys() }
             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
             item { SectionTitle("Appearance") }
             item {

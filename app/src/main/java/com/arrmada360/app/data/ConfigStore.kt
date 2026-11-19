@@ -59,6 +59,10 @@ object ConfigStore {
         private set
     var gridColumns by mutableStateOf(3)
         private set
+    var tmdbKey by mutableStateOf("")
+        private set
+    var traktClientId by mutableStateOf("")
+        private set
 
     fun init(ctx: Context) {
         if (::prefs.isInitialized) return
@@ -66,6 +70,8 @@ object ConfigStore {
         onboarded = prefs.getBoolean("onboarded", false)
         amoled = prefs.getBoolean("amoled", false)
         gridColumns = prefs.getInt("gridColumns", 3)
+        tmdbKey = prefs.getString("tmdbKey", "") ?: ""
+        traktClientId = prefs.getString("traktClientId", "") ?: ""
         val arr = try { JSONArray(prefs.getString("services", "[]")) } catch (e: Exception) { JSONArray() }
         for (i in 0 until arr.length()) {
             arr.optJSONObject(i)?.let { ServiceConfig.fromJson(it) }?.let { services.add(it) }
@@ -121,6 +127,12 @@ object ConfigStore {
     fun updateGridColumns(v: Int) {
         gridColumns = v.coerceIn(2, 5)
         prefs.edit().putInt("gridColumns", gridColumns).apply()
+    }
+
+    fun updateDiscoverKeys(tmdb: String, trakt: String) {
+        tmdbKey = tmdb.trim()
+        traktClientId = trakt.trim()
+        prefs.edit().putString("tmdbKey", tmdbKey).putString("traktClientId", traktClientId).apply()
     }
 
     /** Export everything as JSON (for backup / moving to a new phone). */

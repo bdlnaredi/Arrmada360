@@ -444,6 +444,21 @@ class ArrApi(val cfg: ServiceConfig) {
         }
     }
 
+    /** Sonarr: most recently imported episodes (one per show). */
+    suspend fun recentImports(): List<CalEntry> {
+        val q = mapOf("pageSize" to 80, "sortKey" to "date", "sortDirection" to "descending", "eventType" to 3, "includeSeries" to true, "includeEpisode" to true)
+        val recs = fetchList("history", q)
+        return recs.filter { it.str("eventType").let { e -> e.isEmpty() || e == "downloadFolderImported" } }.mapNotNull { o ->
+            val s = o.obj("series") ?: return@mapNotNull null
+            val e = o.obj("episode")
+            CalEntry(
+                o.int("id"), o.int("seriesId"), s.str("title"),
+                if (e != null) "S%02dE%02d · %s".format(e.int("seasonNumber"), e.int("episodeNumber"), e.str("title")) else o.str("sourceTitle"),
+                o.str("date"), true, image(s, "poster"),
+            )
+        }.distinctBy { it.parentId }.take(20)
+    }
+
     suspend fun removeQueue(id: Int, removeFromClient: Boolean, blocklist: Boolean) {
         delete("queue/$id", mapOf("removeFromClient" to removeFromClient, "blocklist" to blocklist))
     }
