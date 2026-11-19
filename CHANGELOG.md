@@ -11,6 +11,12 @@ Builds #2, #5, #10, #15, #18 and #19 failed to compile in CI and were fixed stra
 ## [Unreleased] – next build
 
 ### Changed
+- **Cleaner side menu**:
+  - Logo and wordmark at the top, with a thin rule and an edit button that opens your apps in Settings.
+  - One flat list: Dashboard, then each app with its own logo. No category headers, tiles or status dots.
+  - The current screen has a soft highlight and an accent bar.
+  - A small red dot shows only when an app is offline.
+  - Footer: a Settings button and a Connection card (🏠 Local / 🌍 Remote, apps online) that opens Connection switching.
 - **Dashboard search bar**: the search button is now a search bar in the top bar ("Search movies, TV…") that **searches automatically as you type**. Results show matches already in your libraries first, then new titles you can add.
 - **Status marks now say whether a title is actually downloaded**:
   - ✓ green: **downloaded** (on your server)

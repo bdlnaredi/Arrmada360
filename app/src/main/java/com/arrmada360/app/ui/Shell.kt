@@ -19,6 +19,11 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -161,10 +166,13 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
             drawerState = drawer,
             gesturesEnabled = (nav.stack.size == 1 && ConfigStore.flag(com.arrmada360.app.data.Pref.DRAWER_GESTURE)) || drawer.isOpen,
             drawerContent = {
-                DrawerContent(current) { r ->
+                DrawerContent(current, go = { r ->
                     nav.root(r)
                     scope.launch { drawer.close() }
-                }
+                }, push = { r ->
+                    nav.push(r)
+                    scope.launch { drawer.close() }
+                })
             },
         ) {
             Box(Modifier.fillMaxSize()) {
@@ -243,71 +251,90 @@ private fun ServiceRoot(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, bac
 }
 
 @Composable
-private fun DrawerContent(current: Route, go: (Route) -> Unit) {
-    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background) {
-        Column(Modifier.verticalScroll(rememberScrollState())) {
-            Box(
-                Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Accent.copy(alpha = 0.55f), Accent2.copy(alpha = 0.45f), Pink.copy(alpha = 0.30f))))
-                    .padding(horizontal = 20.dp, vertical = 28.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(painterResource(R.drawable.ic_launcher_foreground), null, tint = Color.Unspecified, modifier = Modifier.size(56.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Column {
-                        Text("Arrmada360", style = MaterialTheme.typography.headlineSmall, color = Color.White)
-                        val online = ConfigStore.services.count { Connections.of(it.id) is Conn.Ok }
-                        Text("${ConfigStore.services.size} apps · $online online", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f))
-                        if (ConfigStore.services.any { it.hasRemote }) {
-                            val home = ConfigStore.services.filter { it.hasRemote }.all { com.arrmada360.app.net.NetSwitch.useLocal(it) }
-                            Text(if (home) "🏠 Local connection" else "🌍 Remote connection", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
+private fun DrawerContent(current: Route, go: (Route) -> Unit, push: (Route) -> Unit) {
+    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surface, drawerShape = androidx.compose.foundation.shape.RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp)) {
+        Column(Modifier.fillMaxSize()) {
+            // ---- header: logo + wordmark, thin rule, edit button
+            Row(Modifier.padding(start = 24.dp, end = 20.dp, top = 28.dp, bottom = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(painterResource(R.drawable.ic_launcher_foreground), null, tint = Color.Unspecified, modifier = Modifier.size(44.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    androidx.compose.ui.text.buildAnnotatedString {
+                        append("Arrmada")
+                        pushStyle(androidx.compose.ui.text.SpanStyle(color = Accent)); append("360"); pop()
+                    },
+                    style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold,
+                )
             }
-            Column(Modifier.padding(horizontal = 12.dp)) {
-                Spacer(Modifier.height(8.dp))
-                val colors = NavigationDrawerItemDefaults.colors(
-                    unselectedContainerColor = Color.Transparent,
-                    selectedContainerColor = Accent.copy(alpha = 0.18f),
-                )
-                NavigationDrawerItem(
-                    label = { Text("Dashboard") }, selected = current == Route.Dashboard,
-                    icon = { Icon(Icons.Filled.Dashboard, null, tint = Accent) }, onClick = { go(Route.Dashboard) }, colors = colors,
-                )
-                Category.entries.forEach { cat ->
-                    val list = ConfigStore.services.filter { it.type.category == cat }
-                    if (list.isNotEmpty()) {
-                        SectionTitle(cat.title, Modifier.padding(top = 4.dp))
-                        list.forEach { s ->
-                            val st = Connections.of(s.id)
-                            NavigationDrawerItem(
-                                label = { Text(s.display(), fontWeight = FontWeight.Medium) },
-                                selected = (current as? Route.Service)?.id == s.id,
-                                icon = { ServiceBadge(s.type, 32.dp, s.name) },
-                                badge = {
-                                    when (st) {
-                                        is Conn.Ok -> StatusDot(Good)
-                                        is Conn.Fail -> StatusDot(Bad)
-                                        else -> {}
-                                    }
-                                },
-                                onClick = { go(Route.Service(s.id)) },
-                                colors = NavigationDrawerItemDefaults.colors(
-                                    unselectedContainerColor = Color.Transparent,
-                                    selectedContainerColor = s.type.tint.copy(alpha = 0.20f),
-                                ),
-                            )
-                        }
-                    }
+            Row(Modifier.padding(start = 24.dp, end = 16.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f).height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
+                Spacer(Modifier.width(12.dp))
+                Box(
+                    Modifier.size(38.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).background(Accent.copy(alpha = 0.16f))
+                        .clickable { push(Route.Settings) },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Filled.Edit, "Edit apps", tint = Accent, modifier = Modifier.size(18.dp)) }
+            }
+            // ---- flat, calm list
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
+                DrawerRow("Dashboard", current == Route.Dashboard, Accent, onClick = { go(Route.Dashboard) }) {
+                    Icon(Icons.Filled.Dashboard, null, tint = if (current == Route.Dashboard) Accent else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(26.dp))
                 }
-                HorizontalDivider(Modifier.padding(vertical = 12.dp))
-                NavigationDrawerItem(
-                    label = { Text("Settings") }, selected = current == Route.Settings,
-                    icon = { Icon(Icons.Filled.Settings, null) }, onClick = { go(Route.Settings) }, colors = colors,
-                )
-                Spacer(Modifier.height(24.dp))
+                ConfigStore.services.forEach { s ->
+                    val sel = (current as? Route.Service)?.id == s.id
+                    val failing = Connections.of(s.id) is Conn.Fail
+                    DrawerRow(s.display(), sel, s.type.tint, warn = failing, onClick = { go(Route.Service(s.id)) }) { ServiceLogo(s.type, 30.dp, s.name) }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+            // ---- footer: settings + connection pill
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(56.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+                        .background(if (current == Route.Settings) Accent.copy(alpha = 0.2f) else MaterialTheme.colorScheme.background)
+                        .clickable { go(Route.Settings) },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Filled.Settings, "Settings", tint = MaterialTheme.colorScheme.onSurface) }
+                Spacer(Modifier.width(10.dp))
+                val remoteApps = ConfigStore.services.filter { it.hasRemote }
+                val local = remoteApps.isEmpty() || remoteApps.all { com.arrmada360.app.net.NetSwitch.useLocal(it) }
+                val online = ConfigStore.services.count { Connections.of(it.id) is Conn.Ok }
+                Row(
+                    Modifier.weight(1f).height(56.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+                        .background(MaterialTheme.colorScheme.background).clickable { push(Route.SettingsConnection) }.padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(if (local) Icons.Filled.Home else Icons.Filled.Public, null, tint = if (local) Good else Accent2)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("CONNECTION", style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (local) "Local" else "Remote", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                    Text("$online/${ConfigStore.services.size}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun DrawerRow(label: String, selected: Boolean, color: Color, warn: Boolean = false, onClick: () -> Unit, icon: @Composable () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 2.dp).height(56.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+            .background(if (selected) color.copy(alpha = 0.14f) else Color.Transparent).clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.width(4.dp).height(32.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(if (selected) color else Color.Transparent))
+        Spacer(Modifier.width(14.dp))
+        Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) { icon() }
+        Spacer(Modifier.width(18.dp))
+        Text(
+            label, style = MaterialTheme.typography.titleMedium, maxLines = 1,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
+            modifier = Modifier.weight(1f),
+        )
+        if (warn) Box(Modifier.padding(end = 16.dp).size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Bad))
     }
 }
 

@@ -363,6 +363,21 @@ fun PillTabs(tabs: List<String>, selected: Int, onSelect: (Int) -> Unit, modifie
 }
 
 // ------------------------------------------------------------------ logos & widgets
+/** Just the app's logo, no tile – used in the side menu. Initials in a soft circle while it loads. */
+@Composable
+fun ServiceLogo(type: ServiceType, size: Dp = 30.dp, name: String? = null) {
+    var loaded by remember(type, name) { mutableStateOf(false) }
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        if (!loaded) Box(Modifier.size(size).clip(CircleShape).background(type.tint.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
+            Text(type.short, color = type.tint, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.36f).sp)
+        }
+        AsyncImage(
+            model = type.logoUrl(name), contentDescription = type.label, contentScale = ContentScale.Fit,
+            modifier = Modifier.size(size), onSuccess = { loaded = true }, onError = { loaded = false },
+        )
+    }
+}
+
 /** The app's official logo on a tinted tile. Falls back to initials while offline. */
 @Composable
 fun ServiceBadge(type: ServiceType, size: Dp = 36.dp, name: String? = null) {
