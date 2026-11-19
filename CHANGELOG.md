@@ -8,6 +8,16 @@ Builds #2, #5, #10, #15, #18 and #19 failed to compile in CI and were fixed stra
 
 ---
 
+## [Unreleased] – next build
+
+### Fixed
+- **Namer search returned no results.** The app was "cleaning" the file name (dots to spaces, quality tags removed) before sending it to Namer, which breaks ThePornDB's file-name parsing.
+  - It now searches with the **original file name** first, then automatically retries with a cleaned version.
+  - Errors are no longer hidden: if Namer rejects the request or replies unexpectedly, you see the message. "No matches" shows what was searched and **Namer's raw reply**.
+
+### Added
+- **Match by fingerprint** (phash) in Namer's Match & rename. It works even when the file name is meaningless.
+
 ## [1.0.22] – 2026-11-19
 
 ### Changed

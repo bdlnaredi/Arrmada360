@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Queue
 import androidx.compose.material.icons.filled.Search
@@ -160,47 +161,100 @@ private fun QueueTab(api: NamerApi) {
     }
 }
 
-/** Cleans a file name into a sensible search phrase: dots/underscores → spaces, drop resolution tags. */
-private fun guessQuery(f: NamerFile): String =
-    f.name.ifEmpty { f.file.substringAfterLast('/').substringBeforeLast('.') }
-        .replace(Regex("[._]+"), " ")
+/** Search phrases to try, best first: the original file name (ThePornDB parses it), then a cleaned version. */
+private fun queryCandidates(f: NamerFile): List<String> {
+    val videoExt = setOf("mp4", "mkv", "avi", "wmv", "mov", "m4v", "webm", "flv", "ts", "mpg", "mpeg") + f.ext.lowercase()
+    val stem = f.name.ifEmpty { f.file.substringAfterLast('/') }.let { n ->
+        if (n.contains('.') && n.substringAfterLast('.').lowercase() in videoExt) n.substringBeforeLast('.') else n
+    }
+    val cleaned = stem.replace(Regex("[._]+"), " ")
         .replace(Regex("(?i)\\b(2160p|1080p|720p|480p|4k|xxx|mp4|mkv|hevc|h\\.?26[45]|x26[45]|web(-?dl)?|hd|sd)\\b"), " ")
         .replace(Regex("\\s+"), " ").trim()
+    return listOf(stem, cleaned).filter { it.isNotBlank() }.distinct()
+}
+
+private class SearchOutcome(val matches: List<NamerMatch>, val usedQuery: String, val reply: String)
 
 @Composable
 private fun MatchSheet(api: NamerApi, f: NamerFile, onDismiss: () -> Unit, onDone: () -> Unit) {
     val run = rememberRunner()
-    var query by remember { mutableStateOf(guessQuery(f)) }
-    var submitted by remember { mutableStateOf(query) }
+    val candidates = remember(f) { queryCandidates(f) }
+    var query by remember { mutableStateOf(candidates.firstOrNull() ?: "") }
+    // null = automatic (try every candidate until something matches); otherwise exactly what the user typed
+    var submitted by remember { mutableStateOf<String?>(null) }
     var type by remember { mutableIntStateOf(0) }
+    var usePhash by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf<NamerMatch?>(null) }
-    val results = rememberLoadable(api.cfg, f.file, submitted, type) { if (submitted.isBlank()) emptyList() else api.search(f.file, submitted, SEARCH_TYPES[type]) }
+    var showReply by remember { mutableStateOf(false) }
+    val results = rememberLoadable(api.cfg, f.file, submitted, type, usePhash) {
+        val t = SEARCH_TYPES[type]
+        if (usePhash) SearchOutcome(api.phash(f.file, t), "video fingerprint", api.lastReply)
+        else {
+            val tries = submitted?.let { listOf(it) } ?: candidates
+            var out = SearchOutcome(emptyList(), tries.firstOrNull() ?: "", "")
+            for (q in tries) {
+                val m = api.search(f.file, q, t)
+                out = SearchOutcome(m, q, api.lastReply)
+                if (m.isNotEmpty()) break
+            }
+            out
+        }
+    }
     val art = showArt(api.cfg)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxWidth().height(680.dp).imePadding()) {
+        Column(Modifier.fillMaxWidth().height(700.dp).imePadding()) {
             Text("Match & rename", style = MaterialTheme.typography.titleLarge, color = Color.White, modifier = Modifier.padding(horizontal = 16.dp))
             Text(f.file, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, modifier = Modifier.padding(horizontal = 16.dp))
             OutlinedTextField(
                 query, { query = it }, singleLine = true, leadingIcon = { Icon(Icons.Filled.Search, null) },
-                placeholder = { Text("Site, performer, title or date") },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { submitted = query.trim() }),
-                modifier = Modifier.fillMaxWidth().padding(12.dp), shape = RoundedCornerShape(12.dp),
+                placeholder = { Text("File name, or site + performer / title / date") },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { usePhash = false; submitted = query.trim() }),
+                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp), shape = RoundedCornerShape(12.dp),
             )
-            ChipRow(SEARCH_TYPES, type, { type = it }, Modifier.padding(bottom = 8.dp))
-            LoadableContent(results, empty = { it.isEmpty() }, emptyText = "No matches – try fewer words, e.g. just the site and a performer") { list ->
-                LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(list, key = { it.uuid + it.name }) { m ->
-                        Panel(Modifier.fillMaxWidth(), tint = if (m.score >= 90) Good else null, onClick = { confirm = m }) {
-                            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                if (art && m.poster != null) { Poster(m.poster, Modifier.width(96.dp), ratio = 16f / 9f, corner = 8.dp); Spacer(Modifier.width(10.dp)) }
-                                Column(Modifier.weight(1f)) {
-                                    Text(m.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                    Text(listOf(m.site, m.date).filter { it.isNotEmpty() }.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    if (m.performers.isNotEmpty()) Text(m.performers, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Spacer(Modifier.height(4.dp))
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        if (m.type.isNotEmpty()) Pill(m.type.lowercase().replaceFirstChar { it.uppercase() }, api.cfg.type.tint)
-                                        if (m.score >= 0) Pill("${m.score.toInt()}% match", if (m.score >= 90) Good else if (m.score >= 70) Warn else Bad)
+            Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { usePhash = false; submitted = query.trim() }) { Icon(Icons.Filled.Search, null); Text(" Search") }
+                TextButton(onClick = { usePhash = true }) { Icon(Icons.Filled.Fingerprint, null); Text(" Match by fingerprint") }
+            }
+            ChipRow(SEARCH_TYPES, type, { type = it }, Modifier.padding(bottom = 6.dp))
+            val d = results.data
+            when {
+                d == null && results.error != null -> Column(Modifier.padding(16.dp)) {
+                    Text("Search failed", style = MaterialTheme.typography.titleMedium, color = Bad)
+                    Text(results.error ?: "", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                    Text("If this keeps happening, check that a ThePornDB API token is set in namer.cfg (porndb_token) and look at Namer's log.",
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton(onClick = { results.load() }) { Text("Try again") }
+                }
+                d == null -> Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    androidx.compose.material3.CircularProgressIndicator(color = api.cfg.type.tint)
+                    Spacer(Modifier.height(10.dp))
+                    Text(if (usePhash) "Fingerprinting the video – this can take a minute…" else "Searching ThePornDB…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                d.matches.isEmpty() -> Column(Modifier.padding(16.dp)) {
+                    Text("No matches", style = MaterialTheme.typography.titleMedium, color = Warn)
+                    Text("Searched for: “${d.usedQuery}” (${SEARCH_TYPES[type]})", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                    Text("Try: just the site and a performer, the date as YY.MM.DD, another type (Scenes / Movies), or Match by fingerprint.",
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                    TextButton(onClick = { showReply = !showReply }) { Text(if (showReply) "Hide Namer's reply" else "Show Namer's reply") }
+                    if (showReply) Text(d.reply.ifEmpty { "(nothing)" }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                else -> {
+                    Text("${d.matches.size} matches for “${d.usedQuery}”", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp))
+                    LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(d.matches, key = { it.uuid + "|" + it.name + "|" + it.date }) { m ->
+                            Panel(Modifier.fillMaxWidth(), tint = if (m.score >= 90) Good else null, onClick = { confirm = m }) {
+                                Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    if (art && m.poster != null) { Poster(m.poster, Modifier.width(96.dp), ratio = 16f / 9f, corner = 8.dp); Spacer(Modifier.width(10.dp)) }
+                                    Column(Modifier.weight(1f)) {
+                                        Text(m.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                        Text(listOf(m.site, m.date).filter { it.isNotEmpty() }.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        if (m.performers.isNotEmpty()) Text(m.performers, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Spacer(Modifier.height(4.dp))
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            if (m.type.isNotEmpty()) Pill(m.type.lowercase().replaceFirstChar { it.uppercase() }, api.cfg.type.tint)
+                                            if (m.score >= 0) Pill("${m.score.toInt()}% match", if (m.score >= 90) Good else if (m.score >= 70) Warn else Bad)
+                                        }
                                     }
                                 }
                             }
@@ -215,7 +269,13 @@ private fun MatchSheet(api: NamerApi, f: NamerFile, onDismiss: () -> Unit, onDon
             onDismissRequest = { confirm = null },
             title = { Text("Rename to this match?") },
             text = { Text("${m.name}\n${listOf(m.site, m.date).filter { it.isNotEmpty() }.joinToString(" · ")}\n\nNamer will tag, rename and move the file to your destination folder.") },
-            confirmButton = { TextButton(onClick = { confirm = null; run("Sent to Namer – renaming", onDone) { api.rename(f.file, m.uuid) } }) { Text("Rename", color = Good, fontWeight = FontWeight.Bold) } },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirm = null
+                    if (m.uuid.isEmpty()) run(null) { throw Exception("This result has no ThePornDB id – pick another") }
+                    else run("Sent to Namer – renaming", onDone) { api.rename(f.file, m.uuid) }
+                }) { Text("Rename", color = Good, fontWeight = FontWeight.Bold) }
+            },
             dismissButton = { TextButton(onClick = { confirm = null }) { Text("Cancel") } },
         )
     }
