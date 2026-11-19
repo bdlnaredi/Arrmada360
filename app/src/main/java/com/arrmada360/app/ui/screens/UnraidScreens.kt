@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PowerSettingsNew
@@ -413,7 +414,7 @@ private fun UnraidDockerTab(api: UnraidApi) {
                             if (running) IconButton(onClick = { run("Stopped ${c.name}", { l.load(true) }) { api.containerAction(c.id, "stop") } }) { Icon(Icons.Filled.Stop, "Stop", tint = Bad) }
                             else IconButton(onClick = { run("Started ${c.name}", { l.load(true) }) { api.containerAction(c.id, "start") } }) { Icon(Icons.Filled.PlayArrow, "Start", tint = Good) }
                             Box {
-                                IconButton(onClick = { menu = true }) { Icon(androidx.compose.material.icons.Icons.Filled.MoreVert, null) }
+                                IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, null) }
                                 DropdownMenu(menu, { menu = false }) {
                                     DropdownMenuItem(text = { Text("Pause") }, leadingIcon = { Icon(Icons.Filled.Pause, null) }, onClick = { menu = false; run("Paused ${c.name}", { l.load(true) }) { api.gql("mutation { docker { pause(id: \"${c.id}\") { id state } } }") } })
                                     DropdownMenuItem(text = { Text("Unpause") }, leadingIcon = { Icon(Icons.Filled.PlayArrow, null) }, onClick = { menu = false; run("Unpaused ${c.name}", { l.load(true) }) { api.gql("mutation { docker { unpause(id: \"${c.id}\") { id state } } }") } })
