@@ -219,7 +219,7 @@ class ArrApi(val cfg: ServiceConfig) {
     // ---------------- images ----------------
     private val origin: String get() {
         val u = cfg.baseUrl.toHttpUrl()
-        "${u.scheme}://${u.host}:${u.port}"
+        return "${u.scheme}://${u.host}:${u.port}"
     }
 
     fun image(o: JSONObject?, vararg types: String): String? {
