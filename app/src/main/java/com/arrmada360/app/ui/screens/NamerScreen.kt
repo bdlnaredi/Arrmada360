@@ -81,6 +81,22 @@ private val SEARCH_TYPES = listOf("Any", "Scenes", "Movies", "JAV")
 private fun showArt(cfg: ServiceConfig) = ConfigStore.flag("namerArt_" + cfg.id)
 
 @Composable
+private fun ArtworkSwitch(cfg: ServiceConfig, compact: Boolean = false) {
+    val on = showArt(cfg)
+    Panel(Modifier.fillMaxWidth(), tint = if (on) Good else cfg.type.tint, onClick = { ConfigStore.setFlag("namerArt_" + cfg.id, !on) }) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = if (compact) 6.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Image, null, tint = if (on) Good else MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Show ThePornDB artwork", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                if (!compact) Text(if (on) "Poster images are shown in match results" else "Off – match results are text only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            androidx.compose.material3.Switch(on, { ConfigStore.setFlag("namerArt_" + cfg.id, it) })
+        }
+    }
+}
+
+@Composable
 fun NamerScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () -> Unit) {
     val api = remember(cfg) { NamerApi(cfg) }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
@@ -94,12 +110,7 @@ fun NamerScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () ->
                 0 -> FailedTab(api)
                 1 -> QueueTab(api)
                 else -> GenericServerTab(cfg, nav) {
-                    item {
-                        com.arrmada360.app.ui.MenuRow(
-                            Icons.Filled.Image, if (showArt(cfg)) "Artwork: shown" else "Artwork: hidden",
-                            "Show ThePornDB poster images in match results. Off by default.", cfg.type.tint, arrow = false,
-                        ) { ConfigStore.setFlag("namerArt_" + cfg.id, !showArt(cfg)) }
-                    }
+                    item { Box(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) { ArtworkSwitch(cfg) } }
                 }
             }
         }
@@ -113,6 +124,7 @@ private fun FailedTab(api: NamerApi) {
     var actions by remember { mutableStateOf<NamerFile?>(null) }
     LoadableContent(l, empty = { it.isEmpty() }, emptyText = "No failed files 🎉\nEverything Namer saw was matched.") { list ->
         LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { ArtworkSwitch(api.cfg) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatTile("Need matching", list.size.toString(), Warn, Modifier.weight(1f))
@@ -200,7 +212,6 @@ private fun MatchSheet(api: NamerApi, f: NamerFile, onDismiss: () -> Unit, onDon
             out
         }
     }
-    val art = showArt(api.cfg)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxWidth().height(700.dp).imePadding()) {
             Text("Match & rename", style = MaterialTheme.typography.titleLarge, color = Color.White, modifier = Modifier.padding(horizontal = 16.dp))
@@ -217,6 +228,7 @@ private fun MatchSheet(api: NamerApi, f: NamerFile, onDismiss: () -> Unit, onDon
                 TextButton(onClick = { usePhash = true }) { Icon(Icons.Filled.Fingerprint, null); Text(" Match by fingerprint") }
             }
             ChipRow(SEARCH_TYPES, type, { type = it }, Modifier.padding(bottom = 6.dp))
+            Box(Modifier.padding(horizontal = 12.dp, vertical = 2.dp)) { ArtworkSwitch(api.cfg, compact = true) }
             val d = results.data
             when {
                 d == null && results.error != null -> Column(Modifier.padding(16.dp)) {
@@ -245,7 +257,7 @@ private fun MatchSheet(api: NamerApi, f: NamerFile, onDismiss: () -> Unit, onDon
                         items(d.matches, key = { it.uuid + "|" + it.name + "|" + it.date }) { m ->
                             Panel(Modifier.fillMaxWidth(), tint = if (m.score >= 90) Good else null, onClick = { confirm = m }) {
                                 Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    if (art && m.poster != null) { Poster(m.poster, Modifier.width(96.dp), ratio = 16f / 9f, corner = 8.dp); Spacer(Modifier.width(10.dp)) }
+                                    if (showArt(api.cfg) && m.poster != null) { Poster(m.poster, Modifier.width(96.dp), ratio = 16f / 9f, corner = 8.dp); Spacer(Modifier.width(10.dp)) }
                                     Column(Modifier.weight(1f)) {
                                         Text(m.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                         Text(listOf(m.site, m.date).filter { it.isNotEmpty() }.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -178,7 +178,7 @@ Bottom tabs: **Failed · Queue · Server**
 Needs Namer running in watchdog mode with its web UI turned on (default port 6980).
 - **Failed**: files Namer couldn't match. Search ThePornDB (Any, Scenes, Movies or JAV), pick the right result and rename, see why a file failed, or delete it.
 - **Queue**: files waiting to be processed.
-- Artwork from ThePornDB is **hidden by default**. Turn it on per instance in the Server tab.
+- Artwork from ThePornDB is **hidden by default**. Turn on **Show ThePornDB artwork** at the top of the Failed list, in the Match & rename sheet, or in the Server tab.
 
 ### Everything else
 

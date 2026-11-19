@@ -8,6 +8,11 @@ Builds #2, #5, #10, #15, #18 and #19 failed to compile in CI and were fixed stra
 
 ---
 
+## [1.0.24] – 2026-11-19
+
+### Changed
+- **Namer artwork switch is easy to find.** *Show ThePornDB artwork* is now a real on/off switch at the top of the **Failed** list, inside the **Match & rename** sheet (it takes effect immediately) and in the **Server** tab. It is still off by default.
+
 ## [1.0.23] – 2026-11-19
 
 ### Fixed
