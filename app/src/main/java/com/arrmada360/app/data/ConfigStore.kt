@@ -101,12 +101,12 @@ object ConfigStore {
     var onboarded by mutableStateOf(false)
         private set
     var amoled by mutableStateOf(false)
+        private set
     /** "dark", "light" or "system" */
     var themeMode by mutableStateOf("dark")
     var materialYou by mutableStateOf(false)
     fun updateTheme(mode: String) { themeMode = mode; prefs.edit().putString("themeMode", mode).apply() }
     fun updateMaterialYou(v: Boolean) { materialYou = v; prefs.edit().putBoolean("materialYou", v).apply() }
-        private set
     var gridColumns by mutableStateOf(3)
         private set
     var tmdbKey by mutableStateOf("")

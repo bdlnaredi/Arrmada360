@@ -131,7 +131,10 @@ fun friendlyError(e: Throwable): String = when (e) {
 object OfflineCache {
     var dir: java.io.File? = null
     /** When the screen is showing saved data, the time that data was saved. */
-    var offlineSince by androidx.compose.runtime.mutableStateOf<Long?>(null)
+    private val since = androidx.compose.runtime.mutableStateOf<Long?>(null)
+    var offlineSince: Long?
+        get() = since.value
+        set(v) { since.value = v }
     private const val MAX_BYTES = 60L * 1024 * 1024
 
     val enabled: Boolean get() = !com.arrmada360.app.data.ConfigStore.flag("offlineCacheOff")

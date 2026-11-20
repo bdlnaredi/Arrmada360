@@ -842,7 +842,8 @@ fun PrivateArtSwitch(cfg: com.arrmada360.app.data.ServiceConfig, compact: Boolea
 @Composable
 fun OfflineBanner() {
     val since = com.arrmada360.app.net.OfflineCache.offlineSince ?: return
-    val ago = ((System.currentTimeMillis() - since) / 60000).let { if (it < 1) "just now" else if (it < 60) "$it min ago" else "${it / 60} h ago" }
+    val mins: Long = (System.currentTimeMillis() - since) / 60000L
+    val ago = if (mins < 1L) "just now" else if (mins < 60L) "$mins min ago" else "${mins / 60L} h ago"
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp).clip(RoundedCornerShape(50)).background(Warn.copy(alpha = 0.22f)).padding(horizontal = 12.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
