@@ -554,6 +554,28 @@ class ArrApi(val cfg: ServiceConfig) {
         }
     }
 
+    // ---------------- year in review ----------------
+    /** Dates (and grabbed sizes) of every history event of [eventType] between [from] and [to]. 1 = grabbed, 3 = imported. */
+    suspend fun historyBetween(eventType: Int, from: LocalDate, to: LocalDate): List<Pair<LocalDate, Long>> {
+        val out = mutableListOf<Pair<LocalDate, Long>>()
+        var page = 1
+        while (page <= 8) {
+            val recs = fetchList("history", mapOf("page" to page, "pageSize" to 1000, "sortKey" to "date", "sortDirection" to "descending", "eventType" to eventType))
+            if (recs.isEmpty()) break
+            var older = false
+            for (o in recs) {
+                val d = try { java.time.OffsetDateTime.parse(o.str("date")).toLocalDate() } catch (e: Exception) { continue }
+                if (d.isBefore(from)) { older = true; break }
+                if (d.isAfter(to)) continue
+                val size = o.obj("data")?.str("size")?.toLongOrNull() ?: 0L
+                out += d to size
+            }
+            if (older || recs.size < 1000) break
+            page++
+        }
+        return out
+    }
+
     // ---------------- bulk editing ----------------
     private val idsKey get() = when (type) { ServiceType.SONARR -> "seriesIds"; ServiceType.RADARR -> "movieIds"; ServiceType.LIDARR -> "artistIds"; else -> "authorIds" }
 

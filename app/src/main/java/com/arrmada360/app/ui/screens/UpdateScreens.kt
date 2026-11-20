@@ -146,14 +146,14 @@ fun UpdatesScreen(nav: Navigator, back: () -> Unit) {
                                 Text("Installed: build #$current", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f))
                                 if (info != null) Text("Latest: build #${info.build} · ${humanBytes(info.size)} · ${fmtDate(info.published, true)}",
                                     style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f))
-                                if (info == null && latest.error != null) Text(latest.error ?: "", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                                if (info == null && latest.error != null) Text(latest.error ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
                             }
                         }
                         Spacer(Modifier.height(16.dp))
                         val p = UpdateState.progress
                         when {
                             p >= 0f -> {
-                                Text("Downloading… ${(p * 100).toInt()}%", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("Downloading… ${(p * 100).toInt()}%", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.height(6.dp)); ProgressBar(p, color = Color.White, height = 8.dp)
                             }
                             newer && info != null -> GradientButton("Download & install build #${info.build}", Modifier.fillMaxWidth()) { install(info) }
@@ -175,7 +175,7 @@ fun UpdatesScreen(nav: Navigator, back: () -> Unit) {
             }
             val notes = log.data?.let { Updates.notesSince(it, current) }
             if (!notes.isNullOrBlank()) {
-                item { Text("What's new since your version", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(start = 8.dp, top = 6.dp)) }
+                item { Text("What's new since your version", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(start = 8.dp, top = 6.dp)) }
                 item { Panel(Modifier.fillMaxWidth()) { Box(Modifier.padding(16.dp)) { MarkdownText(notes) } } }
             }
         }
@@ -211,7 +211,7 @@ fun MarkdownText(md: String) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.width(4.dp).height(22.dp).clip(RoundedCornerShape(50)).background(c))
                         Spacer(Modifier.width(8.dp))
-                        Text(line.removePrefix("## ").replace("[", "").replace("]", ""), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.ExtraBold)
+                        Text(line.removePrefix("## ").replace("[", "").replace("]", ""), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.ExtraBold)
                     }
                 }
                 line.startsWith("### ") -> {

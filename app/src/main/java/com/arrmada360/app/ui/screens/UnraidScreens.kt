@@ -164,7 +164,7 @@ private fun UnraidDashboard(api: UnraidApi, goTab: (Int) -> Unit) {
                                 PulseDot(Good)
                                 Spacer(Modifier.width(8.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(s.hostname.ifEmpty { "Unraid" }, style = MaterialTheme.typography.headlineSmall, color = Color.White)
+                                    Text(s.hostname.ifEmpty { "Unraid" }, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
                                     Text(listOf(if (s.version.isNotEmpty()) "Unraid ${s.version}" else "", s.cpu).filter { it.isNotEmpty() }.joinToString(" · "),
                                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     if (s.uptime.isNotEmpty()) Text("Up since ${fmtDate(s.uptime, true).ifEmpty { s.uptime }}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -198,7 +198,7 @@ private fun UnraidDashboard(api: UnraidApi, goTab: (Int) -> Unit) {
                     Panel(Modifier.fillMaxWidth(), tint = Bad) {
                         Column(Modifier.padding(14.dp)) {
                             Text("Disk warnings", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Bad)
-                            bad.forEach { Text("• ${it.name}: ${it.status}${if (it.errors > 0) " · ${it.errors} errors" else ""}", style = MaterialTheme.typography.bodySmall, color = Color.White) }
+                            bad.forEach { Text("• ${it.name}: ${it.status}${if (it.errors > 0) " · ${it.errors} errors" else ""}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface) }
                             hot.forEach { Text("• ${it.name} is ${it.temp}°C", style = MaterialTheme.typography.bodySmall, color = Warn) }
                         }
                     }
@@ -217,7 +217,7 @@ private fun UnraidDashboard(api: UnraidApi, goTab: (Int) -> Unit) {
                                     Spacer(Modifier.width(6.dp))
                                     if (n.timestamp.isNotEmpty()) Text(fmtDate(n.timestamp, true).ifEmpty { n.timestamp }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                Text(n.subject.ifEmpty { n.title }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(n.subject.ifEmpty { n.title }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 if (n.description.isNotEmpty()) Text(n.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
                             }
                             IconButton(onClick = { run("Dismissed", { l.load(true) }) { api.archiveNotification(n.id) } }) { Icon(Icons.Filled.Close, "Dismiss") }
@@ -246,7 +246,7 @@ private fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier = this.cli
 @Composable
 private fun Gauge(label: String, v: Float, text: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        RingGauge(v, color, Modifier.size(88.dp), stroke = 9.dp) { Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White) }
+        RingGauge(v, color, Modifier.size(88.dp), stroke = 9.dp) { Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) }
         Spacer(Modifier.height(4.dp))
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -258,7 +258,7 @@ private fun PowerButton(label: String, icon: ImageVector, color: Color, modifier
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = color)
             Spacer(Modifier.width(10.dp))
-            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
@@ -279,7 +279,7 @@ private fun UnraidArrayTab(api: UnraidApi) {
                             if (a.total > 0) {
                                 val p = a.used.toFloat() / a.total
                                 RingGauge(p, if (p > 0.9f) Bad else MaterialTheme.colorScheme.primary, Modifier.size(96.dp), stroke = 10.dp) {
-                                    Text("${(p * 100).toInt()}%", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text("${(p * 100).toInt()}%", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 }
                                 Spacer(Modifier.width(16.dp))
                             }
@@ -287,7 +287,7 @@ private fun UnraidArrayTab(api: UnraidApi) {
                                 Pill(a.state, if (started) Good else Warn)
                                 Spacer(Modifier.height(6.dp))
                                 if (a.total > 0) {
-                                    Text("${humanBytes(a.used)} used", style = MaterialTheme.typography.titleSmall, color = Color.White)
+                                    Text("${humanBytes(a.used)} used", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                                     Text("${humanBytes(a.total - a.used)} free of ${humanBytes(a.total)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Text("${a.disks.count { it.kind == "Data" }} data · ${a.disks.count { it.kind == "Parity" }} parity · ${a.disks.count { it.kind == "Cache" }} cache",
@@ -306,7 +306,7 @@ private fun UnraidArrayTab(api: UnraidApi) {
             item {
                 Panel(Modifier.fillMaxWidth(), tint = Accent2) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("Parity check", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Parity check", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         if (parity != null) {
                             Text(listOf(parity.status, if (parity.speed.isNotEmpty()) parity.speed else "", parity.errors?.let { "$it errors" } ?: "",
                                 if (parity.date.isNotEmpty()) fmtDate(parity.date, true) else "").filter { it.isNotEmpty() }.joinToString(" · "),
@@ -349,7 +349,7 @@ private fun DiskRow(d: UnraidDisk) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 StatusDot(color, 10.dp)
                 Spacer(Modifier.width(10.dp))
-                Text(d.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.weight(1f))
+                Text(d.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
                 d.spinning?.let { Pill(if (it) "Spinning" else "Spun down", if (it) Good else MaterialTheme.colorScheme.onSurfaceVariant) }
                 Spacer(Modifier.width(6.dp))
                 d.temp?.let { t -> Pill("$t°C", if (t >= 50) Bad else if (t >= 45) Warn else Accent) }
@@ -405,7 +405,7 @@ private fun UnraidDockerTab(api: UnraidApi) {
                             if (running) PulseDot(Good, size = 8.dp) else StatusDot(Bad, 8.dp)
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
-                                Text(c.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(c.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 Text(c.status.ifEmpty { c.state.lowercase() }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                                 if (c.image.isNotEmpty()) Text(c.image, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 if (c.autoStart) Pill("Autostart", Accent)
@@ -448,7 +448,7 @@ private fun UnraidVmTab(api: UnraidApi) {
                             Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(color.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) { Icon(Icons.Filled.Computer, null, tint = color) }
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 Pill(v.state.lowercase().replaceFirstChar { it.uppercase() }, color)
                             }
                         }
@@ -496,7 +496,7 @@ private fun UnraidSharesTab(api: UnraidApi) {
                             Icon(Icons.Filled.Folder, null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(s.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(s.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 if (s.comment.isNotEmpty()) Text(s.comment, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                             }
                             if (s.cache.isNotEmpty()) Pill("Cache: ${s.cache}", Accent)

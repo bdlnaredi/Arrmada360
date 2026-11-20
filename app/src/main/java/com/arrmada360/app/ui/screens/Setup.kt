@@ -157,7 +157,7 @@ private fun WelcomeScreen(onStart: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(28.dp))
-            Text("Arrmada360", fontSize = 36.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Text("Arrmada360", fontSize = 36.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(8.dp))
             Text(
                 "Your whole media server in one app.\nEvery feature unlocked — free, forever.",
@@ -328,12 +328,12 @@ fun ServiceEditorScreen(
                 result?.let { (ok, msg) ->
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background((if (ok) Good else Bad).copy(alpha = 0.22f)).padding(12.dp),
-                    ) { Text((if (remote.isNotBlank()) "🏠 Local: " else "") + (if (ok) "✓ Connected – " else "✗ ") + msg, color = Color.White, style = MaterialTheme.typography.bodySmall) }
+                    ) { Text((if (remote.isNotBlank()) "🏠 Local: " else "") + (if (ok) "✓ Connected – " else "✗ ") + msg, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodySmall) }
                 }
                 remoteResult?.let { (ok, msg) ->
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background((if (ok) Good else Bad).copy(alpha = 0.22f)).padding(12.dp),
-                    ) { Text("🌍 Remote: " + (if (ok) "✓ Connected – " else "✗ ") + msg, color = Color.White, style = MaterialTheme.typography.bodySmall) }
+                    ) { Text("🌍 Remote: " + (if (ok) "✓ Connected – " else "✗ ") + msg, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodySmall) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(

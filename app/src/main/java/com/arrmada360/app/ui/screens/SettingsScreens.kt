@@ -71,6 +71,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import com.arrmada360.app.ui.humanBytes
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.draw.drawBehind
@@ -148,7 +149,7 @@ private fun RowIcon(icon: ImageVector, tint: Color) {
 fun SettingSwitch(title: String, subtitle: String?, checked: Boolean, divider: Boolean = true, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth().clickable { onChange(!checked) }.padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             if (!subtitle.isNullOrEmpty()) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.width(12.dp))
@@ -179,7 +180,7 @@ fun SettingLink(
         if (leading != null) { leading(); Spacer(Modifier.width(16.dp)) }
         else if (icon != null) { RowIcon(icon, tint); Spacer(Modifier.width(16.dp)) }
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (!subtitle.isNullOrEmpty()) Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         if (value != null) Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp))
@@ -222,7 +223,7 @@ fun SettingsGate(back: () -> Unit, content: @Composable () -> Unit) {
                 Icon(Icons.Filled.Fingerprint, null, tint = Color.White, modifier = Modifier.size(60.dp))
             }
             Spacer(Modifier.height(20.dp))
-            Text("Authenticate to open settings", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            Text("Authenticate to open settings", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(16.dp))
             GradientButton("Unlock") { ask() }
         }
@@ -257,7 +258,7 @@ private fun AppGridTile(c: ServiceConfig, modifier: Modifier, onClick: () -> Uni
             com.arrmada360.app.ui.ServiceLogo(c.type, 30.dp, c.name)
         }
         Spacer(Modifier.width(12.dp))
-        Text(c.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1,
+        Text(c.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
             overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         if (failing) Box(Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Bad))
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
@@ -322,7 +323,7 @@ fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
         title = "", isRoot = isRoot, onBack = back,
         titleContent = {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(end = 12.dp)) {
-                Text("Settings", style = MaterialTheme.typography.headlineMedium, color = Color.White, modifier = Modifier.weight(1f))
+                Text("Settings", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
                 Row(
                     Modifier.clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { nav.push(if (updateReady) Route.Updates else Route.Changelog) }
                         .padding(start = 8.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
@@ -334,7 +335,7 @@ fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
                     }
                     Spacer(Modifier.width(6.dp))
                     Column {
-                        Text(if (updateReady) "Update ready" else "What's New", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(if (updateReady) "Update ready" else "What's New", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         Text("v$ver", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Accent)
                     }
                 }
@@ -360,13 +361,13 @@ fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
                         .background(Brush.linearGradient(listOf(Good.copy(alpha = 0.22f), MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)))),
                 ) {
                     Row(Modifier.padding(start = 22.dp, end = 18.dp, top = 20.dp, bottom = 12.dp), verticalAlignment = Alignment.Bottom) {
-                        Text("$online", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Black, color = Color.White)
+                        Text("$online", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
                         Text(" / ${ConfigStore.services.size} apps online", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 8.dp).weight(1f))
                         Row(
                             Modifier.clip(RoundedCornerShape(50)).background(Good.copy(alpha = 0.85f)).clickable { nav.push(Route.Health) }.padding(horizontal = 16.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                        ) { Icon(Icons.Filled.Wifi, null, tint = Color.White, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Test", color = Color.White, fontWeight = FontWeight.Bold) }
+                        ) { Icon(Icons.Filled.Wifi, null, tint = Color.White, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Test", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) }
                     }
                     Text("Every feature is free – no credits, no subscriptions.", style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 22.dp, bottom = 12.dp))
@@ -383,7 +384,7 @@ fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
                         Spacer(Modifier.width(16.dp))
                         Column(Modifier.weight(1f)) {
                             Text("STARTUP SCREEN", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
-                            Text(startupName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(startupName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         }
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -420,13 +421,13 @@ fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
                         Modifier.clip(RoundedCornerShape(50)).background(Color(0xFF24292F)).clickable { uri.openUri("https://github.com/${com.arrmada360.app.api.Updates.REPO}") }
                             .padding(horizontal = 22.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                    ) { Icon(Icons.Filled.Code, null, tint = Color.White); Spacer(Modifier.width(8.dp)); Text("GitHub", color = Color.White, fontWeight = FontWeight.Bold) }
+                    ) { Icon(Icons.Filled.Code, null, tint = Color.White); Spacer(Modifier.width(8.dp)); Text("GitHub", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) }
                     Spacer(Modifier.width(12.dp))
                     Row(
                         Modifier.clip(RoundedCornerShape(50)).background(Accent2.copy(alpha = 0.85f)).clickable { nav.push(Route.Changelog) }
                             .padding(horizontal = 22.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                    ) { Icon(Icons.Filled.NewReleases, null, tint = Color.White); Spacer(Modifier.width(8.dp)); Text("Changelog", color = Color.White, fontWeight = FontWeight.Bold) }
+                    ) { Icon(Icons.Filled.NewReleases, null, tint = Color.White); Spacer(Modifier.width(8.dp)); Text("Changelog", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) }
                 }
                 Text("Privacy: nothing leaves your phone except to your own servers →", style = MaterialTheme.typography.labelLarge, color = Good, fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 18.dp)
@@ -545,6 +546,10 @@ fun GeneralSettingsScreen(nav: Navigator, back: () -> Unit) {
                     val f = File(ctx.filesDir, "crash.txt")
                     crashText = if (f.exists()) f.readText() else ""
                 }
+                var offlineOn by remember { mutableStateOf(!ConfigStore.flag("offlineCacheOff")) }
+                SettingSwitch("Offline cache", "Keep the last copy of your libraries, calendars and stats so they still show when a server is unreachable (${humanBytes(com.arrmada360.app.net.OfflineCache.sizeBytes())} saved).", offlineOn) {
+                    offlineOn = it; ConfigStore.setFlag("offlineCacheOff", !it); if (!it) com.arrmada360.app.net.OfflineCache.clear()
+                }
                 SettingLink(Icons.Filled.HideImage, "Clear image cache", "Useful if Radarr, Sonarr, etc. show the wrong poster art or logos.") {
                     ctx.imageLoader.memoryCache?.clear()
                     ctx.imageLoader.diskCache?.clear()
@@ -552,6 +557,7 @@ fun GeneralSettingsScreen(nav: Navigator, back: () -> Unit) {
                 }
                 SettingLink(Icons.Filled.DeleteSweep, "Clear cached app data", "Logs out of download clients and reloads every app. Useful if lists look out of date.", divider = false) {
                     DownloadClients.clearCache()
+                    com.arrmada360.app.net.OfflineCache.clear()
                     Connections.state.clear()
                     ctx.toast("Cache cleared – everything will reload")
                 }
@@ -730,7 +736,7 @@ fun NotificationsScreen(nav: Navigator, back: () -> Unit) {
                     RowIcon(if (enabled) Icons.Filled.NotificationsActive else Icons.Filled.Notifications, if (enabled) Good else MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(16.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Enable notifications", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Enable notifications", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         Text("Turn the background media-notifier on.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(enabled, { setEnabled(it) }, colors = SwitchDefaults.colors(checkedTrackColor = Good, checkedThumbColor = Color(0xFF111318), uncheckedTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)))
@@ -785,7 +791,7 @@ fun DeepLinksScreen(back: () -> Unit) {
                 links.forEachIndexed { i, (url, label) ->
                     Row(Modifier.fillMaxWidth().clickable { ctx.copyText(url) }.padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             Text(url, style = MaterialTheme.typography.bodySmall, color = Rainbow[i % Rainbow.size])
                         }
                         IconButton(onClick = { ctx.copyText(url) }) { Icon(Icons.Filled.ContentCopy, "Copy", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -803,13 +809,24 @@ fun AppearanceScreen(back: () -> Unit) {
     SettingsPage("Appearance", back) {
         item {
             SettingsGroup("Theme") {
-                SettingSwitch("AMOLED black", "Pure black background to save battery on OLED screens.", ConfigStore.amoled, divider = false) { ConfigStore.updateAmoled(it) }
+                val modes = listOf("dark" to "Dark", "light" to "Light", "system" to "Follow phone")
+                Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                    Text("Theme", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        modes.forEach { (k, label) ->
+                            androidx.compose.material3.FilterChip(ConfigStore.themeMode == k, { ConfigStore.updateTheme(k) }, label = { Text(label) })
+                        }
+                    }
+                }
+                if (android.os.Build.VERSION.SDK_INT >= 31) SettingSwitch("Material You colours", "Use colours from your wallpaper instead of each app's brand colours.", ConfigStore.materialYou) { ConfigStore.updateMaterialYou(it) }
+                SettingSwitch("AMOLED black", "Pure black background to save battery on OLED screens (dark theme).", ConfigStore.amoled, divider = false) { ConfigStore.updateAmoled(it) }
             }
         }
         item {
             SettingsGroup("Library") {
                 Column(Modifier.padding(20.dp)) {
-                    Text("Poster columns: ${ConfigStore.gridColumns}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Poster columns: ${ConfigStore.gridColumns}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     Slider(value = ConfigStore.gridColumns.toFloat(), onValueChange = { ConfigStore.updateGridColumns(Math.round(it)) }, valueRange = 2f..5f, steps = 2)
                 }
             }
@@ -931,7 +948,7 @@ fun ConnectionSwitchScreen(back: () -> Unit) {
                     Row(Modifier.fillMaxWidth().clickable { ConfigStore.updateConnMode(k) }.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(ConfigStore.connMode == k, { ConfigStore.updateConnMode(k) })
                         Column(Modifier.weight(1f)) {
-                            Text(t, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(t, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -950,7 +967,7 @@ fun ConnectionSwitchScreen(back: () -> Unit) {
                     Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Wifi, null, tint = Good)
                         Spacer(Modifier.width(12.dp))
-                        Text(s, style = MaterialTheme.typography.titleMedium, color = Color.White, modifier = Modifier.weight(1f))
+                        Text(s, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
                         if (s == ns.ssid) Pill("Connected", Good)
                         IconButton(onClick = { ConfigStore.updateHomeSsids(ConfigStore.homeSsids - s) }) { Icon(Icons.Filled.DeleteSweep, "Remove", tint = Bad) }
                     }
@@ -977,7 +994,7 @@ fun ConnectionSwitchScreen(back: () -> Unit) {
                         ServiceBadge(c.type, 36.dp, c.name)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(c.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(c.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             Text(c.baseUrl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         when {

@@ -155,7 +155,7 @@ private fun ArticlesView(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = { selected = emptySet(); selecting = false }) { Icon(Icons.Filled.Close, "Done") }
-                Text("${selected.size} selected", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.weight(1f))
+                Text("${selected.size} selected", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
                 IconButton(onClick = { selected = if (selected.size == visible.size) emptySet() else visible.map { keyOf(it) }.toSet() }) { Icon(Icons.Filled.SelectAll, "Select all") }
                 IconButton(enabled = chosen.isNotEmpty(), onClick = { download(chosen, null) }) { Icon(Icons.Filled.Download, "Download", tint = Good) }
                 if (client.supportsCategories) IconButton(enabled = chosen.isNotEmpty(), onClick = { catTarget = chosen }) { Icon(Icons.AutoMirrored.Filled.Label, "Download to category") }
@@ -274,7 +274,7 @@ private fun CategoryPicker(client: DownloadClient, count: Int, onDismiss: () -> 
                 if (list == null) Text("Loading categories…", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 else list.forEachIndexed { i, c ->
                     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onPick(c) }.padding(vertical = 10.dp, horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        StatusDot(Rainbow[i % Rainbow.size], 10.dp); Spacer(Modifier.width(10.dp)); Text(c, fontWeight = FontWeight.SemiBold, color = Color.White)
+                        StatusDot(Rainbow[i % Rainbow.size], 10.dp); Spacer(Modifier.width(10.dp)); Text(c, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -312,14 +312,14 @@ private fun FeedsView(rss: RssClient, feeds: com.arrmada360.app.ui.Loadable<List
                             Column(Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
-                                        Text("RSS reader", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                                        Text("RSS reader", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                         Text("Fetch feeds in qBittorrent", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     Switch(reader, { on -> run(if (on) "RSS reader on" else "RSS reader off", { settings.load(true) }) { rss.rssSetSettings(on, auto) } })
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
-                                        Text("Auto-download", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                                        Text("Auto-download", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                         Text("Let your rules download matches automatically", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     Switch(auto, { on -> run(if (on) "Auto-download on" else "Auto-download off", { settings.load(true) }) { rss.rssSetSettings(reader, on) } })
@@ -339,7 +339,7 @@ private fun FeedsView(rss: RssClient, feeds: com.arrmada360.app.ui.Loadable<List
                             }
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(f.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(f.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(f.url, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Spacer(Modifier.height(4.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -411,7 +411,7 @@ private fun RulesView(cfg: ServiceConfig, client: DownloadClient, rss: RssClient
                             Icon(Icons.Filled.Rule, null, tint = if (r.enabled) Good else MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(r.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(r.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 if (r.mustContain.isNotEmpty()) Text("Must contain: ${r.mustContain}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                                 if (r.mustNotContain.isNotEmpty()) Text("Must not contain: ${r.mustNotContain}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                                 Spacer(Modifier.height(4.dp))
@@ -450,7 +450,7 @@ private fun RuleEditor(rss: RssClient, rule: RssRule?, feeds: List<RssFeed>, cat
     var matches by remember { mutableStateOf<List<String>?>(null) }
     ModalBottomSheet(onDismissRequest = onDone, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(horizontal = 20.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(if (rule == null) "New download rule" else "Edit rule", style = MaterialTheme.typography.titleLarge, color = Color.White)
+            Text(if (rule == null) "New download rule" else "Edit rule", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
             OutlinedTextField(name, { name = it }, label = { Text("Rule name") }, singleLine = true, enabled = rule == null, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(must, { must = it }, label = { Text("Must contain") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                 supportingText = { Text(if (regex) "Regular expression" else "Words separated by spaces; use | for OR, * as wildcard") })
@@ -471,7 +471,7 @@ private fun RuleEditor(rss: RssClient, rule: RssRule?, feeds: List<RssFeed>, cat
             matches?.let { m ->
                 Panel(Modifier.fillMaxWidth(), tint = if (m.isEmpty()) Warn else Good) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(if (m.isEmpty()) "Nothing in your feeds matches yet" else "${m.size} matching articles", style = MaterialTheme.typography.titleSmall, color = Color.White)
+                        Text(if (m.isEmpty()) "Nothing in your feeds matches yet" else "${m.size} matching articles", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                         m.take(15).forEach { Text("• $it", style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                     }
                 }

@@ -88,7 +88,7 @@ private fun ArtworkSwitch(cfg: ServiceConfig, compact: Boolean = false) {
             Icon(Icons.Filled.Image, null, tint = if (on) Good else MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Show ThePornDB artwork", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Show ThePornDB artwork", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 if (!compact) Text(if (on) "Poster images are shown in match results" else "Off – match results are text only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             androidx.compose.material3.Switch(on, { ConfigStore.setFlag("namerArt_" + cfg.id, it) })
@@ -135,7 +135,7 @@ private fun FailedTab(api: NamerApi) {
                 Panel(Modifier.fillMaxWidth(), tint = Warn, onClick = { matching = f }, onLongClick = { actions = f }) {
                     Row(Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(f.name.ifEmpty { f.file }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(f.name.ifEmpty { f.file }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             Spacer(Modifier.height(4.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                 if (f.ext.isNotEmpty()) Pill(f.ext, api.cfg.type.tint)
@@ -164,7 +164,7 @@ private fun QueueTab(api: NamerApi) {
             items(list, key = { "q" + it.file + it.updated }) { f ->
                 Panel(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(f.name.ifEmpty { f.file }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(f.name.ifEmpty { f.file }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Text("${f.ext} · ${humanBytes(f.size)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -214,7 +214,7 @@ private fun MatchSheet(api: NamerApi, f: NamerFile, onDismiss: () -> Unit, onDon
     }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxWidth().height(700.dp).imePadding()) {
-            Text("Match & rename", style = MaterialTheme.typography.titleLarge, color = Color.White, modifier = Modifier.padding(horizontal = 16.dp))
+            Text("Match & rename", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = 16.dp))
             Text(f.file, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, modifier = Modifier.padding(horizontal = 16.dp))
             OutlinedTextField(
                 query, { query = it }, singleLine = true, leadingIcon = { Icon(Icons.Filled.Search, null) },
@@ -233,7 +233,7 @@ private fun MatchSheet(api: NamerApi, f: NamerFile, onDismiss: () -> Unit, onDon
             when {
                 d == null && results.error != null -> Column(Modifier.padding(16.dp)) {
                     Text("Search failed", style = MaterialTheme.typography.titleMedium, color = Bad)
-                    Text(results.error ?: "", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                    Text(results.error ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
                     Text("If this keeps happening, check that a ThePornDB API token is set in namer.cfg (porndb_token) and look at Namer's log.",
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     TextButton(onClick = { results.load() }) { Text("Try again") }
@@ -245,7 +245,7 @@ private fun MatchSheet(api: NamerApi, f: NamerFile, onDismiss: () -> Unit, onDon
                 }
                 d.matches.isEmpty() -> Column(Modifier.padding(16.dp)) {
                     Text("No matches", style = MaterialTheme.typography.titleMedium, color = Warn)
-                    Text("Searched for: “${d.usedQuery}” (${SEARCH_TYPES[type]})", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                    Text("Searched for: “${d.usedQuery}” (${SEARCH_TYPES[type]})", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
                     Text("Try: just the site and a performer, the date as YY.MM.DD, another type (Scenes / Movies), or Match by fingerprint.",
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                     TextButton(onClick = { showReply = !showReply }) { Text(if (showReply) "Hide Namer's reply" else "Show Namer's reply") }
@@ -259,7 +259,7 @@ private fun MatchSheet(api: NamerApi, f: NamerFile, onDismiss: () -> Unit, onDon
                                 Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                     if (showArt(api.cfg) && m.poster != null) { Poster(m.poster, Modifier.width(96.dp), ratio = 16f / 9f, corner = 8.dp); Spacer(Modifier.width(10.dp)) }
                                     Column(Modifier.weight(1f)) {
-                                        Text(m.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                        Text(m.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                         Text(listOf(m.site, m.date).filter { it.isNotEmpty() }.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         if (m.performers.isNotEmpty()) Text(m.performers, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Spacer(Modifier.height(4.dp))

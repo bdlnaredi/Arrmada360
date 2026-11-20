@@ -101,6 +101,11 @@ object ConfigStore {
     var onboarded by mutableStateOf(false)
         private set
     var amoled by mutableStateOf(false)
+    /** "dark", "light" or "system" */
+    var themeMode by mutableStateOf("dark")
+    var materialYou by mutableStateOf(false)
+    fun updateTheme(mode: String) { themeMode = mode; prefs.edit().putString("themeMode", mode).apply() }
+    fun updateMaterialYou(v: Boolean) { materialYou = v; prefs.edit().putBoolean("materialYou", v).apply() }
         private set
     var gridColumns by mutableStateOf(3)
         private set
@@ -117,8 +122,11 @@ object ConfigStore {
     fun init(ctx: Context) {
         if (::prefs.isInitialized) return
         prefs = ctx.getSharedPreferences("arrmada360", Context.MODE_PRIVATE)
+        com.arrmada360.app.net.OfflineCache.dir = java.io.File(ctx.cacheDir, "offline")
         onboarded = prefs.getBoolean("onboarded", false)
         amoled = prefs.getBoolean("amoled", false)
+        themeMode = prefs.getString("themeMode", "dark") ?: "dark"
+        materialYou = prefs.getBoolean("materialYou", false)
         gridColumns = prefs.getInt("gridColumns", 3)
         tmdbKey = prefs.getString("tmdbKey", "") ?: ""
         Pref.defaults.forEach { (k, d) -> flags[k] = prefs.getBoolean(k, d) }

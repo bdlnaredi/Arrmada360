@@ -6,6 +6,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.runtime.key
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -195,7 +197,19 @@ fun ArrScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () -> U
                 0 -> when (libView) {
                     1 -> CalendarTab(api, nav, wanted = false)
                     2 -> CalendarTab(api, nav, wanted = true)
-                    else -> LibraryTab(api, nav)
+                    else -> {
+                        val twoPane = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 1000
+                        var picked by rememberSaveable(cfg.id + "pane") { mutableStateOf<Int?>(null) }
+                        if (!twoPane) LibraryTab(api, nav)
+                        else Row(Modifier.fillMaxSize()) {
+                            Box(Modifier.weight(1f)) { LibraryTab(api, nav) { picked = it } }
+                            Box(Modifier.weight(1f)) {
+                                val id = picked
+                                if (id == null) EmptyBox("Pick something from your library to see it here")
+                                else key(id) { ArrDetailScreen(cfg, id, nav) { picked = null } }
+                            }
+                        }
+                    }
                 }
                 1 -> QueueTab(api)
                 2 -> ArrAddContent(cfg, "", nav) { id -> if (id > 0) nav.push(Route.ArrDetail(cfg.id, id)) }
@@ -280,7 +294,7 @@ fun ArrSystemContent(api: ArrApi) {
                         com.arrmada360.app.ui.ServiceBadge(api.type, 56.dp, api.cfg.name)
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("${d.status.optString("appName", api.type.label)} ${d.status.optString("version")}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("${d.status.optString("appName", api.type.label)} ${d.status.optString("version")}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             val os = listOf(d.status.optString("osName"), d.status.optString("osVersion")).filter { it.isNotEmpty() && it != "null" }.joinToString(" ")
                             if (os.isNotEmpty()) Text(os, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             val branch = d.status.optString("branch")
@@ -381,7 +395,7 @@ private fun DiskDialog(api: ArrApi, onDismiss: () -> Unit) {
 
 // ------------------------------------------------------------ Library
 @Composable
-fun LibraryTab(api: ArrApi, nav: Navigator) {
+fun LibraryTab(api: ArrApi, nav: Navigator, onOpen: ((Int) -> Unit)? = null) {
     val l = rememberLoadable(api.cfg) { api.library() }
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableIntStateOf(0) }
@@ -441,7 +455,7 @@ fun LibraryTab(api: ArrApi, nav: Navigator) {
                     }.toList()
             }
             LazyVerticalGrid(
-                columns = GridCells.Fixed(ConfigStore.gridColumns),
+                columns = if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600) GridCells.Adaptive(118.dp) else GridCells.Fixed(ConfigStore.gridColumns),
                 contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 96.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -450,7 +464,7 @@ fun LibraryTab(api: ArrApi, nav: Navigator) {
                 items(shown, key = { it.id }) { m ->
                     PosterTile(m, selected = m.id in selected, onLong = { selected = if (m.id in selected) selected - m.id else selected + m.id }) {
                         if (selected.isNotEmpty()) selected = if (m.id in selected) selected - m.id else selected + m.id
-                        else { if (ConfigStore.flag(com.arrmada360.app.data.Pref.AUTO_CLEAR_SEARCH)) query = ""; nav.push(Route.ArrDetail(api.cfg.id, m.id)) }
+                        else { if (ConfigStore.flag(com.arrmada360.app.data.Pref.AUTO_CLEAR_SEARCH)) query = ""; if (onOpen != null) onOpen(m.id) else nav.push(Route.ArrDetail(api.cfg.id, m.id)) }
                     }
                 }
             }
@@ -567,13 +581,14 @@ private fun BulkDialogs(api: ArrApi, ids: Set<Int>, action: String?, done: (Bool
 private fun PosterTile(m: MediaItem, selected: Boolean = false, onLong: (() -> Unit)? = null, onClick: () -> Unit) {
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
-    val scale by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.94f else 1f, label = "tile")
+    val focused by src.collectIsFocusedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.94f else if (focused) 1.06f else 1f, label = "tile")
     val color = when { m.complete -> Good; !m.monitored -> Color.Gray; m.raw.optString("status") == "continuing" -> MaterialTheme.colorScheme.primary; else -> Bad }
     Column(
         Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
             .combinedClickable(interactionSource = src, indication = androidx.compose.material3.ripple(), onLongClick = onLong, onClick = onClick),
     ) {
-        Box(Modifier.clip(RoundedCornerShape(12.dp)).border(if (selected) 3.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else color.copy(alpha = 0.45f), RoundedCornerShape(12.dp))) {
+        Box(Modifier.clip(RoundedCornerShape(12.dp)).border(if (selected || focused) 3.dp else 1.dp, if (selected || focused) MaterialTheme.colorScheme.primary else color.copy(alpha = 0.45f), RoundedCornerShape(12.dp))) {
             Poster(m.poster, Modifier.fillMaxWidth(), ratio = if (m.raw.has("artistName")) 1f else 2f / 3f, corner = 12.dp, fallback = m.title)
             if (!m.monitored) Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f)))
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.7f)))))
@@ -595,7 +610,7 @@ private fun PosterTile(m: MediaItem, selected: Boolean = false, onLong: (() -> U
             }
         }
         Spacer(Modifier.height(5.dp))
-        Text(m.title, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(m.title, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         if (m.year > 0) Text(m.year.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }
@@ -647,7 +662,7 @@ private fun CalRow(e: CalEntry, onClick: () -> Unit, trailing: @Composable () ->
         Poster(e.poster, Modifier.width(48.dp), corner = 8.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(e.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(e.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Text(e.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(3.dp))
             Pill(fmtDate(e.date, withTime = e.date.length > 10).ifEmpty { "TBA" }, if (e.hasFile) Good else MaterialTheme.colorScheme.primary)
@@ -667,7 +682,7 @@ private fun QueueTab(api: ArrApi) {
             items(list, key = { it.id }) { q ->
                 Panel(Modifier.fillMaxWidth(), onClick = { selected = q }) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(q.subtitle.ifEmpty { q.title }, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(q.subtitle.ifEmpty { q.title }, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         if (q.subtitle.isNotEmpty()) Text(q.title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Spacer(Modifier.height(8.dp))
                         val p = if (q.size > 0) 1f - q.sizeLeft.toFloat() / q.size else 0f
@@ -772,7 +787,7 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                             Poster(m.poster, Modifier.width(100.dp), ratio = if (cfg.arrType == ServiceType.LIDARR) 1f else 2f / 3f, fallback = m.title)
                             Spacer(Modifier.width(14.dp))
                             Column {
-                                Text(m.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                                Text(m.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
                                 Text(listOf(if (m.year > 0) m.year.toString() else "", m.network, m.status.replaceFirstChar { it.uppercase() })
                                     .filter { it.isNotEmpty() }.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(6.dp))
@@ -983,7 +998,7 @@ private fun GroupHeader(
             Icon(if (mon) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder, "Monitor", tint = if (mon) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Text("$have / ${children.size}", style = MaterialTheme.typography.labelSmall, color = if (have == children.size && have > 0) Good else MaterialTheme.colorScheme.onSurfaceVariant)
         }
         IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, "Search") }
@@ -1001,7 +1016,7 @@ private fun ChildRow(c: ChildItem, onMonitor: () -> Unit, onSearch: () -> Unit, 
                 tint = if (c.monitored) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
         }
         Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
-            Text(c.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(c.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Text(fmtDate(c.subtitle.take(10)).ifEmpty { c.subtitle }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         val aired = parseDate(c.date)?.let { !it.isAfter(java.time.LocalDate.now()) } ?: false
@@ -1168,7 +1183,7 @@ fun ArrAddContent(cfg: ServiceConfig, initialTerm: String, nav: Navigator, onAdd
                             Poster(m.poster, Modifier.width(70.dp), ratio = if (cfg.arrType == ServiceType.LIDARR) 1f else 2f / 3f, fallback = m.title)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(m.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(m.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 Text(listOf(if (m.year > 0) m.year.toString() else "", m.network).filter { it.isNotEmpty() }.joinToString(" · "),
                                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(4.dp))
@@ -1221,7 +1236,7 @@ private fun AddSheet(api: ArrApi, m: MediaItem, onDismiss: () -> Unit, onAdded: 
                 Poster(m.poster, Modifier.width(56.dp), ratio = if (api.type == ServiceType.LIDARR) 1f else 2f / 3f)
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text(m.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(m.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     if (m.year > 0) Text(m.year.toString(), style = MaterialTheme.typography.bodySmall)
                 }
             }

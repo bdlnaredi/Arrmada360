@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -78,6 +79,7 @@ sealed interface Route {
     data object Dashboard : Route
     data class Service(val id: String) : Route
     data class ArrDetail(val serviceId: String, val itemId: Int) : Route
+    data object YearReview : Route
     data class ArrAdd(val serviceId: String, val term: String = "") : Route
     data object Settings : Route
     data object AddService : Route
@@ -173,7 +175,16 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
     }
     com.arrmada360.app.ui.screens.WhatsNewGate()
     com.arrmada360.app.ui.screens.UpdateGate(nav)
-    CompositionLocalProvider(LocalOpenDrawer provides { scope.launch { drawer.open() } }) {
+    val wide = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 840
+    if (wide) CompositionLocalProvider(LocalOpenDrawer provides {}, com.arrmada360.app.ui.LocalWideLayout provides true) {
+        // Tablets, foldables and TVs: side menu always visible next to the content.
+        androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
+            Box(Modifier.width(300.dp).fillMaxHeight()) {
+                DrawerContent(current, go = { r -> nav.root(r) }, push = { r -> nav.push(r) })
+            }
+            Box(Modifier.weight(1f).fillMaxHeight()) { RouteContent(current, nav) }
+        }
+    } else CompositionLocalProvider(LocalOpenDrawer provides { scope.launch { drawer.open() } }) {
         ModalNavigationDrawer(
             drawerState = drawer,
             gesturesEnabled = (nav.stack.size == 1 && ConfigStore.flag(com.arrmada360.app.data.Pref.DRAWER_GESTURE)) || drawer.isOpen,
@@ -216,6 +227,7 @@ private fun RouteContent(r: Route, nav: Navigator) {
         Route.SettingsAppearance -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.AppearanceScreen(back) }
         Route.SettingsDiscovery -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.DiscoverySettingsScreen(back) }
         Route.Health -> com.arrmada360.app.ui.screens.HealthScreen(nav, isRoot, back)
+        Route.YearReview -> com.arrmada360.app.ui.screens.YearReviewScreen(back)
         Route.AddService -> ServicePickerScreen(
             title = "Add a service", subtitle = "Pick an app to connect",
             multi = false, initial = emptySet(), onBack = back,
@@ -323,7 +335,7 @@ private fun DrawerContent(current: Route, go: (Route) -> Unit, push: (Route) -> 
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text("CONNECTION", style = MaterialTheme.typography.labelSmall, letterSpacing = 1.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(if (local) "Local" else "Remote", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(if (local) "Local" else "Remote", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     }
                     Text("$online/${ConfigStore.services.size}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

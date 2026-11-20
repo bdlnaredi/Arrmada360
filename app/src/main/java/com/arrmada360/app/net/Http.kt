@@ -52,10 +52,19 @@ object Http {
     val images: OkHttpClient get() = trusting
 
     suspend fun exec(client: OkHttpClient, req: Request): String = withContext(Dispatchers.IO) {
-        client.newCall(req).execute().use { r ->
-            val body = r.body?.string().orEmpty()
-            if (!r.isSuccessful) throw ApiException(r.code, body)
-            body
+        val key = OfflineCache.keyFor(req)
+        try {
+            client.newCall(req).execute().use { r ->
+                val body = r.body?.string().orEmpty()
+                if (!r.isSuccessful) throw ApiException(r.code, body)
+                if (key != null) { OfflineCache.put(key, body); OfflineCache.online() }
+                body
+            }
+        } catch (e: java.io.IOException) {
+            // Server unreachable: fall back to the last copy we saw, if any.
+            val cached = key?.let { OfflineCache.get(it) } ?: throw e
+            OfflineCache.served(cached.second)
+            cached.first
         }
     }
 }
@@ -115,4 +124,64 @@ fun friendlyError(e: Throwable): String = when (e) {
     is org.json.JSONException -> "Unexpected reply (not JSON) – is this the right app, port and URL base?"
     is IllegalArgumentException -> "Invalid address – use something like http://192.168.1.10:8989"
     else -> e.message ?: e.javaClass.simpleName
+}
+
+
+/** Keeps the last good answer of every read request so the app still shows your library and calendar when a server is unreachable. */
+object OfflineCache {
+    var dir: java.io.File? = null
+    /** When the screen is showing saved data, the time that data was saved. */
+    var offlineSince by androidx.compose.runtime.mutableStateOf<Long?>(null)
+    private const val MAX_BYTES = 60L * 1024 * 1024
+
+    val enabled: Boolean get() = !com.arrmada360.app.data.ConfigStore.flag("offlineCacheOff")
+
+    fun keyFor(req: Request): String? {
+        if (!enabled || dir == null) return null
+        val isRead = when (req.method) {
+            "GET" -> true
+            "POST" -> {
+                val b = req.body ?: return null
+                if ((b.contentLength()) > 20_000) return null
+                val buf = okio.Buffer(); b.writeTo(buf)
+                val text = buf.readUtf8()
+                req.url.encodedPath.endsWith("/graphql") && text.isNotEmpty() && !text.contains("mutation")
+            }
+            else -> false
+        }
+        if (!isRead) return null
+        val extra = if (req.method == "POST") { val buf = okio.Buffer(); req.body?.writeTo(buf); buf.readUtf8() } else ""
+        val raw = req.url.toString() + "|" + extra
+        val md = java.security.MessageDigest.getInstance("SHA-1").digest(raw.toByteArray())
+        return md.joinToString("") { "%02x".format(it) }
+    }
+
+    fun put(key: String, body: String) {
+        if (body.length > 3_000_000) return
+        val d = dir ?: return
+        try {
+            d.mkdirs()
+            java.io.File(d, key).writeText(body)
+            trim(d)
+        } catch (e: Exception) { }
+    }
+
+    fun get(key: String): Pair<String, Long>? {
+        val f = java.io.File(dir ?: return null, key)
+        return if (f.exists()) try { f.readText() to f.lastModified() } catch (e: Exception) { null } else null
+    }
+
+    fun served(savedAt: Long) { offlineSince = savedAt }
+    fun online() { if (offlineSince != null) offlineSince = null }
+
+    fun clear() { dir?.listFiles()?.forEach { it.delete() }; offlineSince = null }
+    fun sizeBytes(): Long = dir?.listFiles()?.sumOf { it.length() } ?: 0
+
+    private var writes = 0
+    private fun trim(d: java.io.File) {
+        if (++writes % 25 != 0) return
+        val files = d.listFiles()?.sortedBy { it.lastModified() } ?: return
+        var total = files.sumOf { it.length() }
+        for (f in files) { if (total <= MAX_BYTES) break; total -= f.length(); f.delete() }
+    }
 }

@@ -124,7 +124,7 @@ fun ProwlarrStatsTab(api: ProwlarrApi) {
                 Panel(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(s.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.weight(1f))
+                            Text(s.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
                             Pill("${s.avgMs} ms", if (s.avgMs < 1500) Good else Warn)
                         }
                         Spacer(Modifier.size(6.dp))
@@ -157,7 +157,7 @@ fun ProwlarrHistoryTab(api: ProwlarrApi) {
                             Spacer(Modifier.weight(1f))
                             Text(fmtDate(h.date, true), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        if (h.query.isNotEmpty()) Text(h.query, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(top = 4.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        if (h.query.isNotEmpty()) Text(h.query, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 4.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -250,7 +250,7 @@ private fun UserRow(avatar: String?, name: String, line1: String, line2: String,
             Box44(avatar, name, color)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 if (line1.isNotEmpty()) Text(line1, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(line2, style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -264,7 +264,7 @@ private fun Box44(url: String?, name: String, color: Color) {
         Modifier.size(44.dp).clip(CircleShape).androidxBackground(color),
         contentAlignment = Alignment.Center,
     ) {
-        Text(name.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
+        Text(name.take(1).uppercase(), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
         if (url != null) AsyncImage(model = url, contentDescription = null, modifier = Modifier.size(44.dp).clip(CircleShape))
     }
 }

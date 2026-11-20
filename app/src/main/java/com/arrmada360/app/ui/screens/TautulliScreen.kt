@@ -155,7 +155,7 @@ private fun SessionCard(s: StreamSession, onStop: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Avatar(s.userThumb, s.user, 22.dp)
                         Spacer(Modifier.width(6.dp))
-                        Text(s.user, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
+                        Text(s.user, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
                         Text("  ·  ${s.player}", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Spacer(Modifier.height(6.dp))
@@ -194,7 +194,7 @@ private fun DetailLine(icon: androidx.compose.ui.graphics.vector.ImageVector, la
         Icon(icon, null, tint = TautColor, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
         Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.6f), modifier = Modifier.width(84.dp))
-        Text(value, style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -235,7 +235,7 @@ private fun HistoryRow(h: PlayHistory) {
             Poster(h.thumb, Modifier.width(42.dp), corner = 8.dp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(h.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(h.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Avatar(null, h.user, 16.dp); Spacer(Modifier.width(5.dp))
                     Text(h.user, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
@@ -268,7 +268,7 @@ private fun TStatsTab(api: TautulliApi) {
                 Column(Modifier.padding(14.dp)) {
                     val p = plays.data
                     val total = p?.series?.sumOf { it.second.sum() } ?: 0
-                    Text("$total plays", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = Color.White)
+                    Text("$total plays", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurface)
                     Text("in the last $days days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))
                     if (p == null) Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) { if (plays.error != null) Text(plays.error ?: "", color = Bad) else CircularProgressIndicator() }
@@ -331,7 +331,7 @@ private fun TopGroupView(g: TopGroup) {
                                 else { Icon(Icons.Filled.Devices, null, tint = Rainbow[i % Rainbow.size], modifier = Modifier.size(26.dp)); Spacer(Modifier.width(10.dp)) }
                                 Column(Modifier.weight(1f)) {
                                     Row {
-                                        Text(e.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(e.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text("${e.plays} plays", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     Spacer(Modifier.height(4.dp))
@@ -351,7 +351,7 @@ private fun TopGroupView(g: TopGroup) {
                                 Text("${i + 1}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black, color = Color.Black)
                             }
                         }
-                        Text(e.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                        Text(e.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                         Text(if (g.id.startsWith("popular")) "${e.users} users" else "${e.plays} plays · ${humanEta(e.duration)}",
                             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                     }
@@ -376,7 +376,7 @@ private fun TUsersTab(api: TautulliApi) {
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(u.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.weight(1f), maxLines = 1)
+                                Text(u.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f), maxLines = 1)
                                 Text("${u.plays}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = c)
                                 Text(" plays", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }

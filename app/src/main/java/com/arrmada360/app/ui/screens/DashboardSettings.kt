@@ -1,5 +1,13 @@
 package com.arrmada360.app.ui.screens
 
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+
 import android.content.Intent
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -320,7 +328,7 @@ private fun UpcomingRow(arrs: List<ServiceConfig>, nav: Navigator) {
                             Box(Modifier.align(Alignment.TopStart).padding(6.dp)) { Pill(relativeDay(parseDate(e.date)), c.type.tint, solid = true) }
                             Box(Modifier.align(Alignment.TopEnd).padding(6.dp)) { ServiceBadge(c.type, 22.dp, c.name) }
                             Column(Modifier.align(Alignment.BottomStart).padding(8.dp)) {
-                                Text(e.title, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(e.title, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 Text(e.subtitle, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White.copy(alpha = 0.8f))
                             }
                         }
@@ -397,7 +405,7 @@ private fun CombinedCalendar(arrs: List<ServiceConfig>, nav: Navigator) {
                                 Poster(e.poster, Modifier.width(50.dp), corner = 8.dp, fallback = e.title)
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     Text(e.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     Spacer(Modifier.height(3.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -421,7 +429,7 @@ private fun BigHeader(title: String, color: Color) {
     Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 26.dp, bottom = 12.dp)) {
         Box(Modifier.width(72.dp).height(4.dp).clip(RoundedCornerShape(50)).background(color))
         Spacer(Modifier.height(10.dp))
-        Text(title, style = MaterialTheme.typography.headlineMedium, color = Color.White)
+        Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -445,7 +453,7 @@ private fun InfoCard(
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(label, style = MaterialTheme.typography.bodyMedium, color = tint, fontWeight = FontWeight.SemiBold)
-                Text(title, style = MaterialTheme.typography.headlineSmall, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(title, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             if (onClick != null) Icon(Icons.Filled.ChevronRight, null, tint = Color.White, modifier = Modifier.size(30.dp))
         }
@@ -461,7 +469,7 @@ fun ServerInfoTab(services: List<ServiceConfig>, nav: Navigator) {
     if (services.isEmpty()) {
         Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(Modifier.height(60.dp))
-            Text("No apps yet", style = MaterialTheme.typography.headlineSmall, color = Color.White)
+            Text("No apps yet", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(16.dp))
             GradientButton("Add an app") { nav.push(Route.AddService) }
         }
@@ -472,6 +480,22 @@ fun ServerInfoTab(services: List<ServiceConfig>, nav: Navigator) {
     val downloaders = services.filter { it.type.isDownloader }
     LazyColumn(contentPadding = PaddingValues(bottom = 40.dp)) {
         item { BigHeader("Server Info", Good) }
+        item(key = "year") {
+            Row(
+                Modifier.padding(horizontal = 12.dp, vertical = 6.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp))
+                    .background(Brush.linearGradient(listOf(Accent.copy(alpha = 0.7f), Accent2.copy(alpha = 0.7f), Pink.copy(alpha = 0.6f))))
+                    .clickable { nav.push(Route.YearReview) }.padding(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(30.dp))
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Your ${java.time.LocalDate.now().year} in review", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Downloads per month, data grabbed, top genres and Plex stats", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f))
+                }
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.White)
+            }
+        }
         item(key = "disk") { DiskSpaceCard(arrs, nav) }
         item(key = "dlhist") { DownloadHistoryCard(arrs, downloaders) }
         item(key = "health") { ArrHealthCard(services.filter { it.type.isArr || it.type == ServiceType.PROWLARR }, nav) }
@@ -614,7 +638,7 @@ private fun ArrHealthCard(apps: List<ServiceConfig>, nav: Navigator) {
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(c.name + " · " + h.type.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall, color = if (h.type.equals("error", true)) Bad else Warn, fontWeight = FontWeight.Bold)
-                    Text(h.message, style = MaterialTheme.typography.bodySmall, color = Color.White)
+                    Text(h.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
@@ -643,8 +667,8 @@ private fun UnraidSummaryCard(u: ServiceConfig, onClick: () -> Unit) {
         }
         if (sys != null && (sys.cpuPercent != null || sys.memTotal > 0)) {
             Spacer(Modifier.height(10.dp))
-            sys.cpuPercent?.let { c -> Text("CPU ${"%.0f".format(c)}%", style = MaterialTheme.typography.labelSmall, color = Color.White); ProgressBar((c / 100).toFloat(), color = u.type.tint) }
-            if (sys.memTotal > 0) { Spacer(Modifier.height(6.dp)); Text("RAM ${humanBytes(sys.memUsed)} / ${humanBytes(sys.memTotal)}", style = MaterialTheme.typography.labelSmall, color = Color.White); ProgressBar(sys.memUsed.toFloat() / sys.memTotal, color = Accent2) }
+            sys.cpuPercent?.let { c -> Text("CPU ${"%.0f".format(c)}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface); ProgressBar((c / 100).toFloat(), color = u.type.tint) }
+            if (sys.memTotal > 0) { Spacer(Modifier.height(6.dp)); Text("RAM ${humanBytes(sys.memUsed)} / ${humanBytes(sys.memTotal)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface); ProgressBar(sys.memUsed.toFloat() / sys.memTotal, color = Accent2) }
         }
     }
 }
@@ -669,7 +693,7 @@ private fun RecentCard(type: ServiceType, title: String, nav: Navigator) {
                             onClick = { nav.push(Route.EditService(null, type)) },
                             colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.25f)),
                             shape = RoundedCornerShape(50),
-                        ) { Text("Go to Settings", color = Color.White, fontWeight = FontWeight.Bold) }
+                        ) { Text("Go to Settings", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) }
                     }
                 }
             }
@@ -681,7 +705,7 @@ private fun RecentCard(type: ServiceType, title: String, nav: Navigator) {
                     Column(Modifier.width(118.dp).clickable { nav.push(Route.ArrDetail(c.id, e.parentId)) }) {
                         Poster(e.poster, Modifier.fillMaxWidth(), ratio = if (type == ServiceType.LIDARR) 1f else 2f / 3f, corner = 14.dp, fallback = e.title)
                         Spacer(Modifier.height(5.dp))
-                        Text(e.title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(e.title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(e.subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
@@ -708,7 +732,7 @@ private fun TautulliCard(nav: Navigator) {
                 Poster(s.thumb, Modifier.width(36.dp), corner = 6.dp)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(s.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(s.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${s.user} · ${s.decision} · ${s.progress}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
             }

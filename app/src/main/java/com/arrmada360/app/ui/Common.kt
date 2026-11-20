@@ -75,6 +75,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -216,6 +218,8 @@ fun AppBackground(modifier: Modifier = Modifier, content: @Composable () -> Unit
 
 // ------------------------------------------------------------------ navigation shell
 val LocalOpenDrawer = staticCompositionLocalOf<() -> Unit> { {} }
+/** True on tablets / TVs where the side menu is always shown. */
+val LocalWideLayout = staticCompositionLocalOf { false }
 
 @Composable
 fun AppScaffold(
@@ -259,12 +263,13 @@ fun AppScaffold(
                             }
                         },
                         navigationIcon = {
-                            if (isRoot) IconButton(onClick = openDrawer) { Icon(Icons.Filled.Menu, "Menu") }
+                            if (isRoot) { if (!LocalWideLayout.current) IconButton(onClick = openDrawer) { Icon(Icons.Filled.Menu, "Menu") } }
                             else IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
                         },
                         actions = { actions() },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                     )
+                    OfflineBanner()
                     if (tabs.isNotEmpty()) PillTabs(tabs, selectedTab, onTab)
                 }
             },
@@ -297,7 +302,7 @@ fun MenuRow(
             ) { Icon(icon, null, tint = Color.White, modifier = Modifier.size(22.dp)) }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 if (!subtitle.isNullOrEmpty()) Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
             }
             if (arrow) Icon(
@@ -492,7 +497,7 @@ fun StatusLegend(modifier: Modifier = Modifier) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 MediaStatusIcon(s, 18.dp)
                 Spacer(Modifier.width(4.dp))
-                Text(l, style = MaterialTheme.typography.labelSmall, color = Color.White)
+                Text(l, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface)
             }
         }
     }
@@ -519,7 +524,8 @@ fun Panel(
 ) {
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.97f else 1f, label = "press")
+    val focused by src.collectIsFocusedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.97f else if (focused) 1.02f else 1f, label = "press")
     val t = tint ?: MaterialTheme.colorScheme.primary
     val surface = MaterialTheme.colorScheme.surface
     val shape = RoundedCornerShape(16.dp)
@@ -528,7 +534,7 @@ fun Panel(
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape)
             .background(Brush.linearGradient(listOf(t.copy(alpha = 0.13f).compositeOver(surface), surface.copy(alpha = 0.92f))))
-            .border(1.dp, Brush.linearGradient(listOf(t.copy(alpha = 0.35f), t.copy(alpha = 0.05f))), shape)
+            .border(if (focused) 2.dp else 1.dp, if (focused) SolidColor(MaterialTheme.colorScheme.primary) else Brush.linearGradient(listOf(t.copy(alpha = 0.35f), t.copy(alpha = 0.05f))), shape)
             .let {
                 if (onClick != null) it.combinedClickable(interactionSource = src, indication = ripple(), onLongClick = onLongClick, onClick = onClick) else it
             },
@@ -828,5 +834,21 @@ fun PrivateArtSwitch(cfg: com.arrmada360.app.data.ServiceConfig, compact: Boolea
             }
             androidx.compose.material3.Switch(on, { set(it) })
         }
+    }
+}
+
+
+/** Shown while screens are filled from the offline cache because a server can't be reached. */
+@Composable
+fun OfflineBanner() {
+    val since = com.arrmada360.app.net.OfflineCache.offlineSince ?: return
+    val ago = ((System.currentTimeMillis() - since) / 60000).let { if (it < 1) "just now" else if (it < 60) "$it min ago" else "${it / 60} h ago" }
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp).clip(RoundedCornerShape(50)).background(Warn.copy(alpha = 0.22f)).padding(horizontal = 12.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(androidx.compose.material.icons.Icons.Filled.CloudOff, null, tint = Warn, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("Offline – showing saved data from $ago", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
     }
 }

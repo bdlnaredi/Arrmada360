@@ -181,7 +181,7 @@ private fun SourcesHint(nav: Navigator) {
         Modifier.padding(12.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp))
             .background(Brush.linearGradient(listOf(Accent2.copy(alpha = 0.35f), Pink.copy(alpha = 0.18f)))).padding(16.dp),
     ) {
-        Text("Turn on discovery", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("Turn on discovery", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         Text(
             "Add Overseerr/Jellyseerr, or a free TMDB API key or Trakt Client ID in Settings, to see trending, upcoming, popular and recommended titles here.",
             style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f),
@@ -279,7 +279,7 @@ private fun PosterCard(i: DiscoverItem, color: Color, libStatus: MediaStatus?, s
             }
         }
         Spacer(Modifier.height(5.dp))
-        Text(i.title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(i.title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(listOf(i.year, i.extra).filter { it.isNotEmpty() }.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }
@@ -316,7 +316,7 @@ private fun EntryRow(
                     }
                 }
                 Spacer(Modifier.height(5.dp))
-                Text(e.title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(e.title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(e.subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -343,7 +343,7 @@ private fun PeopleRow(l: Loadable<DiscoverRow<DiscoverPerson>>, onClick: (Discov
                     if (p.photo != null) AsyncImage(model = p.photo, contentDescription = p.name, contentScale = ContentScale.Crop, modifier = Modifier.size(78.dp).clip(CircleShape))
                 }
                 Spacer(Modifier.height(6.dp))
-                Text(p.name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(p.name, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (p.dept.isNotEmpty()) Text(p.dept, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
         }
@@ -385,7 +385,7 @@ private fun DiscoverSheet(i: DiscoverItem, isMovie: Boolean, lib: LibIndex?, nav
                     val st = lib?.status(i) ?: MediaStatus.IN_LIBRARY
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         MediaStatusIcon(st, 24.dp); Spacer(Modifier.width(8.dp))
-                        Text(st.label, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(st.label, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                     }
                     GradientButton("Open in ${firstArr.name}", Modifier.fillMaxWidth()) { onDismiss(); nav.push(Route.ArrDetail(firstArr.id, libId)) }
                 } else {
@@ -399,7 +399,7 @@ private fun DiscoverSheet(i: DiscoverItem, isMovie: Boolean, lib: LibIndex?, nav
                     if (seerr != null && i.tmdbId > 0) {
                         val seerrSt = MediaStatus.fromSeerr(i.seerrStatus)
                         if (seerrSt != null) {
-                            Row(verticalAlignment = Alignment.CenterVertically) { MediaStatusIcon(seerrSt, 22.dp); Spacer(Modifier.width(8.dp)); Text(seerrSt.label + " in Seerr", color = Color.White, fontWeight = FontWeight.Bold) }
+                            Row(verticalAlignment = Alignment.CenterVertically) { MediaStatusIcon(seerrSt, 22.dp); Spacer(Modifier.width(8.dp)); Text(seerrSt.label + " in Seerr", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) }
                         } else OutlinedButton(onClick = {
                             onDismiss()
                             run("Requested ${i.title}") {
@@ -427,12 +427,12 @@ private fun PersonSheet(p: DiscoverPerson, onDismiss: () -> Unit) {
                 else Text(p.name.take(1), style = MaterialTheme.typography.headlineMedium, color = Color.White)
             }
             Spacer(Modifier.height(12.dp))
-            Text(p.name, style = MaterialTheme.typography.headlineSmall, color = Color.White)
+            Text(p.name, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
             if (p.dept.isNotEmpty()) Pill(p.dept, Accent2)
             if (p.knownFor.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
                 Text("Known for", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                p.knownFor.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.White) }
+                p.knownFor.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) }
             }
             Spacer(Modifier.height(16.dp))
             OutlinedButton(onClick = { uri.openUri(Discover.personUrl(p)) }, modifier = Modifier.fillMaxWidth()) { Text("Open on TMDB") }

@@ -74,7 +74,7 @@ fun ManualImportScreen(cfg: ServiceConfig, back: () -> Unit) {
                 Column {
                     Panel(Modifier.fillMaxWidth().padding(12.dp)) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("Import from a folder", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("Import from a folder", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                             OutlinedTextField(
                                 folder, { folder = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                                 placeholder = { Text("/downloads/complete/tv") },
@@ -92,7 +92,7 @@ fun ManualImportScreen(cfg: ServiceConfig, back: () -> Unit) {
                                 val blocked = q.status.contains("import", true) || q.warning.isNotEmpty()
                                 Panel(Modifier.fillMaxWidth(), tint = if (blocked) Warn else null, onClick = { source = ImportSource.Download(q.downloadId, q.title) }) {
                                     Column(Modifier.padding(12.dp)) {
-                                        Text(q.subtitle.ifEmpty { q.title }, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(q.subtitle.ifEmpty { q.title }, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(q.title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                         Spacer(Modifier.height(4.dp))
                                         Pill(q.status, if (blocked) Warn else MaterialTheme.colorScheme.primary)
@@ -146,7 +146,7 @@ private fun FileRow(f: ImportItem, checked: Boolean, onCheck: (Boolean) -> Unit)
             Checkbox(checked && matched, { onCheck(it) }, enabled = matched)
             Spacer(Modifier.width(6.dp))
             Column(Modifier.weight(1f)) {
-                Text(f.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(f.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (matched) Pill(f.parentTitle, Good) else Pill("Not matched", Bad)
