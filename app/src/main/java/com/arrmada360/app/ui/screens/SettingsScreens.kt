@@ -71,6 +71,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.RocketLaunch
@@ -509,6 +511,24 @@ fun GeneralSettingsScreen(nav: Navigator, back: () -> Unit) {
                 SettingSwitch("Show What's New on update", "Show a screen with all the changes when Arrmada360 updates to a new version.", ConfigStore.flag(Pref.WHATS_NEW)) { ConfigStore.setFlag(Pref.WHATS_NEW, it) }
                 SettingSwitch("Check for updates automatically", "Tell me when a new Arrmada360 build is available and install it in one tap.", ConfigStore.flag(Pref.AUTO_UPDATE_CHECK), divider = false) { ConfigStore.setFlag(Pref.AUTO_UPDATE_CHECK, it) }
             }
+        }
+        item {
+            var lockOn by remember { mutableStateOf(com.arrmada360.app.AppLock.enabled) }
+            var timeout by remember { mutableIntStateOf(com.arrmada360.app.AppLock.timeoutSec) }
+            var timeoutDlg by remember { mutableStateOf(false) }
+            val opts = listOf(0 to "Immediately", 30 to "After 30 seconds", 60 to "After 1 minute", 300 to "After 5 minutes", 900 to "After 15 minutes")
+            SettingsGroup("Security") {
+                SettingSwitch("App lock", "Unlock Arrmada360 with your fingerprint, face or screen lock every time you open it.", lockOn) {
+                    if (it && !com.arrmada360.app.AppLock.deviceSecure(ctx)) ctx.toast("Set a screen lock (PIN, pattern or fingerprint) on your phone first")
+                    else { lockOn = it; ConfigStore.setFlag(com.arrmada360.app.AppLock.PREF, it) }
+                }
+                SettingLink(Icons.Filled.Timer, "Lock after", value = opts.firstOrNull { it.first == timeout }?.second ?: "Immediately", divider = false) { timeoutDlg = true }
+            }
+            if (timeoutDlg) AlertDialog(
+                onDismissRequest = { timeoutDlg = false }, title = { Text("Lock after leaving the app") },
+                text = { Column { opts.forEach { (sec, label) -> TextButton(onClick = { timeout = sec; ConfigStore.putInt(com.arrmada360.app.AppLock.TIMEOUT, sec); timeoutDlg = false }) { Text(label) } } } },
+                confirmButton = { TextButton(onClick = { timeoutDlg = false }) { Text("Close") } },
+            )
         }
         item {
             SettingsGroup("Third-party app integrations") {

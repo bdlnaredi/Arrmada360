@@ -29,6 +29,7 @@ import com.arrmada360.app.data.Pref
 import com.arrmada360.app.data.ServiceConfig
 import com.arrmada360.app.data.ServiceType
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.launch
 
 object Notifier {
     private const val CHANNEL = "arrmada360_media"
@@ -59,23 +60,50 @@ object Notifier {
     fun canPost(ctx: Context): Boolean = Build.VERSION.SDK_INT < 33 ||
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
-    fun post(ctx: Context, id: Int, title: String, text: String, serviceId: String?, link: String? = null) {
+    data class Action(val label: String, val intent: PendingIntent)
+
+    /** Downloads an image for a notification (runs on the worker's background thread). */
+    fun bitmap(url: String?): android.graphics.Bitmap? {
+        if (url.isNullOrEmpty()) return null
+        return try {
+            com.arrmada360.app.net.Http.images.newCall(okhttp3.Request.Builder().url(url).build()).execute().use { r ->
+                if (!r.isSuccessful) null else r.body?.byteStream()?.use { android.graphics.BitmapFactory.decodeStream(it) }
+            }
+        } catch (e: Exception) { null }
+    }
+
+    fun actionIntent(ctx: Context, req: Int, action: String, svc: String, arg: String, notifId: Int): PendingIntent =
+        PendingIntent.getBroadcast(ctx, req, Intent(ctx, NotifActionReceiver::class.java).setAction(action)
+            .putExtra("svc", svc).putExtra("arg", arg).putExtra("nid", notifId), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+
+    fun linkIntent(ctx: Context, req: Int, link: String): PendingIntent =
+        PendingIntent.getActivity(ctx, req, Intent(ctx, MainActivity::class.java).setAction(Intent.ACTION_VIEW).setData(android.net.Uri.parse(link))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+
+    fun post(ctx: Context, id: Int, title: String, text: String, serviceId: String?, link: String? = null,
+             poster: String? = null, backdrop: String? = null, actions: List<Action> = emptyList(), color: Int? = null) {
         if (!canPost(ctx)) return
         ensureChannel(ctx)
+        val large = bitmap(poster)
+        val big = bitmap(backdrop)
         val intent = Intent(ctx, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             if (link != null) data = android.net.Uri.parse(link)
             else if (serviceId != null) data = android.net.Uri.parse("arrmada360://service/$serviceId")
         }
         val pi = PendingIntent.getActivity(ctx, id, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val n = NotificationCompat.Builder(ctx, CHANNEL)
+        val b = NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle(title)
             .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(true)
             .setContentIntent(pi)
-            .build()
+        if (color != null) b.setColor(color)
+        if (large != null) b.setLargeIcon(large)
+        if (big != null) b.setStyle(NotificationCompat.BigPictureStyle().bigPicture(big).setSummaryText(text).also { s -> if (large != null) s.bigLargeIcon(null as android.graphics.Bitmap?) })
+        else b.setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        actions.take(3).forEach { a -> b.addAction(0, a.label, a.intent) }
+        val n = b.build()
         try { NotificationManagerCompat.from(ctx).notify(id, n) } catch (e: SecurityException) { /* permission revoked */ }
     }
 }
@@ -123,8 +151,15 @@ class NotifyWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                     val fresh = imports.filter { it.date > seen }.distinctBy { it.parentTitle + it.detail }
                     fresh.take(5).forEachIndexed { i, h ->
                         val what = when (c.type) { ServiceType.RADARR -> "New movie"; ServiceType.SONARR -> "New episode"; ServiceType.LIDARR -> "New music"; else -> "New book" }
-                        Notifier.post(applicationContext, (c.id + h.date).hashCode() + i, "$what downloaded · ${c.name}",
-                            listOf(h.parentTitle, h.detail).filter { it.isNotEmpty() }.joinToString(" – ").ifEmpty { h.title }, c.id)
+                        val nid = (c.id + h.date).hashCode() + i
+                        val detailLink = if (h.parentId > 0) "arrmada360://item/${c.id}/${h.parentId}" else "arrmada360://service/${c.id}"
+                        Notifier.post(applicationContext, nid, "$what downloaded · ${c.name}",
+                            listOf(h.parentTitle, h.detail).filter { it.isNotEmpty() }.joinToString(" – ").ifEmpty { h.title }, c.id,
+                            link = detailLink, poster = h.poster, backdrop = h.fanart, color = c.type.color.toInt(),
+                            actions = listOf(
+                                Notifier.Action("Open", Notifier.linkIntent(applicationContext, nid, detailLink)),
+                                Notifier.Action("Calendar", Notifier.linkIntent(applicationContext, nid + 1, "arrmada360://calendar")),
+                            ))
                     }
                     if (fresh.size > 5) Notifier.post(applicationContext, c.id.hashCode(), c.name, "…and ${fresh.size - 5} more downloaded", c.id)
                 }
@@ -137,8 +172,14 @@ class NotifyWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 val seenId = seen.toIntOrNull()
                 if (seenId != null) {
                     reqs.filter { it.id > seenId }.take(5).forEach { r ->
-                        Notifier.post(applicationContext, (c.id + r.id).hashCode(), "New request · ${c.name}",
-                            "${r.title} – requested by ${r.requestedBy}" + if (r.status == 1) " (needs approval)" else "", c.id)
+                        val nid = (c.id + r.id).hashCode()
+                        val acts = if (r.status == 1) listOf(
+                            Notifier.Action("Approve", Notifier.actionIntent(applicationContext, nid, NotifActionReceiver.APPROVE, c.id, r.id.toString(), nid)),
+                            Notifier.Action("Decline", Notifier.actionIntent(applicationContext, nid + 1, NotifActionReceiver.DECLINE, c.id, r.id.toString(), nid)),
+                        ) else emptyList()
+                        Notifier.post(applicationContext, nid, "New request · ${c.name}",
+                            "${r.title} – requested by ${r.requestedBy}" + if (r.status == 1) " (needs approval)" else "", c.id,
+                            poster = r.poster, actions = acts, color = c.type.color.toInt())
                     }
                 }
                 ConfigStore.putString(key, newestId.toString())
@@ -152,12 +193,48 @@ class NotifyWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 val before = ConfigStore.getStringSet(setKey)
                 if (ConfigStore.getString(key).isNotEmpty()) {
                     doneNow.filter { it.id !in before }.take(5).forEach { d ->
-                        Notifier.post(applicationContext, (c.id + d.id).hashCode(), "Download finished · ${c.name}", d.name, c.id)
+                        val nid = (c.id + d.id).hashCode()
+                        Notifier.post(applicationContext, nid, "Download finished · ${c.name}", "${d.name}\n${com.arrmada360.app.ui.humanBytes(d.size)}" + if (d.category.isNotEmpty()) " · ${d.category}" else "", c.id,
+                            color = c.type.color.toInt(),
+                            actions = listOf(Notifier.Action("Open downloads", Notifier.linkIntent(applicationContext, nid, "arrmada360://service/${c.id}"))))
                     }
                 }
                 ConfigStore.putStringSet(setKey, ids)
                 ConfigStore.putString(key, "1")
             }
+        }
+    }
+}
+
+
+/** Handles buttons on notifications (approve / decline Seerr requests) without opening the app. */
+class NotifActionReceiver : android.content.BroadcastReceiver() {
+    companion object {
+        const val APPROVE = "com.arrmada360.app.NOTIF_APPROVE"
+        const val DECLINE = "com.arrmada360.app.NOTIF_DECLINE"
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        ConfigStore.init(context.applicationContext)
+        val cfg = ConfigStore.get(intent.getStringExtra("svc") ?: return) ?: return
+        val arg = intent.getStringExtra("arg") ?: return
+        val nid = intent.getIntExtra("nid", 0)
+        val pending = goAsync()
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            val msg = try {
+                com.arrmada360.app.net.NetSwitch.start(context.applicationContext)
+                when (intent.action) {
+                    APPROVE -> { SeerrApi(cfg).approve(arg.toInt()); "Request approved" }
+                    DECLINE -> { SeerrApi(cfg).decline(arg.toInt()); "Request declined" }
+                    else -> null
+                }
+            } catch (e: Exception) { "Failed: " + com.arrmada360.app.net.friendlyError(e) }
+            try {
+                if (msg != null) {
+                    NotificationManagerCompat.from(context).cancel(nid)
+                    Notifier.post(context, nid, msg, cfg.name, cfg.id)
+                }
+            } finally { pending.finish() }
         }
     }
 }

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/u_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="14dp" android:background="@drawable/widget_bg">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_w_calendar" />
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="Coming up" android:textColor="#FFFFFFFF" android:textStyle="bold" android:textSize="14sp" />
+        <ImageView android:id="@+id/u_refresh" android:layout_width="30dp" android:layout_height="30dp" android:padding="5dp" android:background="@drawable/widget_btn" android:src="@drawable/ic_w_refresh" android:contentDescription="Refresh" />
+    </LinearLayout>
+    <TextView android:id="@+id/u_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Tap refresh to load" android:textColor="#FF9AA4B2" android:textSize="11sp" />
+    <LinearLayout android:id="@+id/u_row0" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp" android:gravity="center_vertical" android:visibility="gone">
+        <TextView android:id="@+id/u_day0" android:layout_width="58dp" android:layout_height="wrap_content" android:textColor="#FFA855F7" android:textStyle="bold" android:textSize="11sp" android:maxLines="1" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:id="@+id/u_title0" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FFFFFFFF" android:textStyle="bold" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/u_sub0" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FF9AA4B2" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/u_row1" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp" android:gravity="center_vertical" android:visibility="gone">
+        <TextView android:id="@+id/u_day1" android:layout_width="58dp" android:layout_height="wrap_content" android:textColor="#FFA855F7" android:textStyle="bold" android:textSize="11sp" android:maxLines="1" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:id="@+id/u_title1" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FFFFFFFF" android:textStyle="bold" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/u_sub1" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FF9AA4B2" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/u_row2" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp" android:gravity="center_vertical" android:visibility="gone">
+        <TextView android:id="@+id/u_day2" android:layout_width="58dp" android:layout_height="wrap_content" android:textColor="#FFA855F7" android:textStyle="bold" android:textSize="11sp" android:maxLines="1" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:id="@+id/u_title2" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FFFFFFFF" android:textStyle="bold" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/u_sub2" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FF9AA4B2" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/u_row3" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp" android:gravity="center_vertical" android:visibility="gone">
+        <TextView android:id="@+id/u_day3" android:layout_width="58dp" android:layout_height="wrap_content" android:textColor="#FFA855F7" android:textStyle="bold" android:textSize="11sp" android:maxLines="1" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:id="@+id/u_title3" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FFFFFFFF" android:textStyle="bold" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/u_sub3" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FF9AA4B2" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/u_row4" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp" android:gravity="center_vertical" android:visibility="gone">
+        <TextView android:id="@+id/u_day4" android:layout_width="58dp" android:layout_height="wrap_content" android:textColor="#FFA855F7" android:textStyle="bold" android:textSize="11sp" android:maxLines="1" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:id="@+id/u_title4" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FFFFFFFF" android:textStyle="bold" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+            <TextView android:id="@+id/u_sub4" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FF9AA4B2" android:textSize="11sp" android:maxLines="1" android:ellipsize="end" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

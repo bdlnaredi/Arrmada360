@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_downloads_info">Download speeds and active torrents</string>
+    <string name="widget_upcoming_info">Upcoming movies and episodes</string>
+    <string name="widget_actions_info">Quick shortcuts into Arrmada360</string>
+    <string name="tile_downloads">Downloads</string>
+</resources>

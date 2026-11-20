@@ -21,6 +21,7 @@ import java.io.File
 
 class MainActivity : ComponentActivity() {
     private var pendingLink by mutableStateOf<String?>(null)
+    private lateinit var lock: AppLock.Prompter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,10 +36,23 @@ class MainActivity : ComponentActivity() {
                 .build()
         )
         Notifier.schedule(applicationContext)
+        lock = AppLock.Prompter(this)
         handle(intent)
         setContent {
-            AppRoot(pendingLink) { pendingLink = null }
+            if (AppLock.locked) com.arrmada360.app.ui.screens.LockScreen { lock.unlock() }
+            else AppRoot(pendingLink) { pendingLink = null }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        AppLock.onStart()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        AppLock.onStop()
+        com.arrmada360.app.widget.Widgets.refresh(applicationContext)
     }
 
     override fun onNewIntent(intent: Intent) {

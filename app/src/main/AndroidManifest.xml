@@ -9,6 +9,7 @@
     <!-- Only used to read your Wi-Fi network name for home/away switching -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <application
         android:allowBackup="true"
@@ -47,6 +48,29 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+        <receiver android:name=".widget.DownloadsWidget" android:exported="true" android:label="Arrmada360 downloads">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_downloads_info" />
+        </receiver>
+        <receiver android:name=".widget.UpcomingWidget" android:exported="true" android:label="Arrmada360 coming up">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_upcoming_info" />
+        </receiver>
+        <receiver android:name=".widget.ActionsWidget" android:exported="true" android:label="Arrmada360 shortcuts">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_actions_info" />
+        </receiver>
+        <receiver android:name=".widget.WidgetActionReceiver" android:exported="false" />
+        <receiver android:name=".notify.NotifActionReceiver" android:exported="false" />
+        <service
+            android:name=".widget.DownloadsTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_w_pause"
+            android:label="@string/tile_downloads"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter><action android:name="android.service.quicksettings.action.QS_TILE" /></intent-filter>
+            <meta-data android:name="android.service.quicksettings.TOGGLEABLE_TILE" android:value="true" />
+        </service>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

@@ -152,6 +152,12 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
                     ConfigStore.services.firstOrNull { it.id == key || it.name.equals(key, true) || it.type.name.equals(key, true) }
                         ?.let { nav.root(Route.Service(it.id)) }
                 }
+                "item" -> {
+                    val seg = uri.pathSegments
+                    val svc = seg.getOrNull(0)?.let { ConfigStore.get(it) }
+                    val iid = seg.getOrNull(1)?.toIntOrNull()
+                    if (svc != null && iid != null) { nav.root(Route.Service(svc.id)); nav.push(Route.ArrDetail(svc.id, iid)) }
+                }
                 "movies" -> { DashboardNav.tab = 0; nav.root(Route.Dashboard) }
                 "tv" -> { DashboardNav.tab = 1; nav.root(Route.Dashboard) }
                 "calendar" -> { DashboardNav.tab = 2; nav.root(Route.Dashboard) }

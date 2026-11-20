@@ -75,7 +75,8 @@ data class QueueEntry(
     val downloadId: String = "",
 )
 
-data class HistoryEntry(val title: String, val event: String, val date: String, val quality: String, val parentTitle: String = "", val detail: String = "")
+data class HistoryEntry(val title: String, val event: String, val date: String, val quality: String, val parentTitle: String = "", val detail: String = "",
+    val parentId: Int = 0, val poster: String? = null, val fanart: String? = null)
 
 data class ReleaseEntry(
     val guid: String,
@@ -495,6 +496,9 @@ class ArrApi(val cfg: ServiceConfig) {
                 parentTitle = o.obj(parentKey)?.let { p -> p.str("title").ifEmpty { p.str("artistName") }.ifEmpty { p.str("authorName") } } ?: "",
                 detail = (o.obj("episode")?.let { e -> "S%02dE%02d · %s".format(e.int("seasonNumber"), e.int("episodeNumber"), e.str("title")) }
                     ?: o.obj("album")?.str("title") ?: o.obj("book")?.str("title") ?: ""),
+                parentId = o.int(parentKey + "Id"),
+                poster = image(o.obj(parentKey), "poster", "cover"),
+                fanart = image(o.obj(parentKey), "fanart", "banner"),
             )
         }
     }
