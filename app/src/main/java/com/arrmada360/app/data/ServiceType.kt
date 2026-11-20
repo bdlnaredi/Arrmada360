@@ -56,6 +56,12 @@ enum class ServiceType(
         "Tautulli → Settings → Web Interface → API Key"),
     UNRAID("Unraid", "Un", 0xFFF15A2C, 0xFFE11D48, "unraid", 80, AuthKind.API_KEY, Category.SERVER, "Array, Docker & VMs",
         "Unraid 7.2+: Settings → Management Access → API Keys → create a key (Admin role)"),
+    WHISPARR("Whisparr", "Wh", 0xFFF43F5E, 0xFFDB2777, "whisparr", 6969, AuthKind.API_KEY, Category.MEDIA, "Adult scenes (artwork hidden by default)",
+        "Whisparr → Settings → General → API Key"),
+    UPTIME_KUMA("Uptime Kuma", "UK", 0xFF5CDD8B, 0xFF16A34A, "uptime-kuma", 3001, AuthKind.API_KEY, Category.MONITORING, "Service uptime monitors",
+        "Uptime Kuma → Settings → API Keys → Add API key. Optional: a status page slug shows 24h uptime bars."),
+    STASH("Stasharr / Stash", "St", 0xFF60A5FA, 0xFF8B5CF6, "stash", 2704, AuthKind.API_KEY, Category.TOOLS, "Scene library & tasks (artwork hidden by default)",
+        "Stash → Settings → Security → API Key (leave blank if no login is set)"),
     NAMER("Namer", "Nm", 0xFFEC4899, 0xFFA855F7, "namer", 6980, AuthKind.NONE, Category.TOOLS, "ThePornDB renamer",
         "Namer's web UI (watchdog mode, web = True in namer.cfg). Include web_root in the address if you set one.");
 
@@ -67,7 +73,9 @@ enum class ServiceType(
         val slug = if (this == SEERR && name != null && name.contains("jelly", true)) "jellyseerr" else logo
         return "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/$slug.png"
     }
-    val isArr: Boolean get() = this == SONARR || this == RADARR || this == LIDARR || this == READARR
+    val isArr: Boolean get() = this == SONARR || this == RADARR || this == LIDARR || this == READARR || this == WHISPARR
+    /** Apps whose artwork is adult content and hidden unless switched on per instance. */
+    val privateArt: Boolean get() = this == WHISPARR || this == STASH || this == NAMER
     val isDownloader: Boolean get() = category == Category.DOWNLOADS
     val isIndexer: Boolean get() = category == Category.INDEXERS
 }

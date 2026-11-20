@@ -282,7 +282,8 @@ fun ServiceConfig.display(): String {
     return when (type) {
         ServiceType.RADARR -> "Movies"; ServiceType.SONARR -> "TV Shows"; ServiceType.LIDARR -> "Music"; ServiceType.READARR -> "Books"
         ServiceType.PROWLARR, ServiceType.JACKETT -> "Indexers"; ServiceType.SEERR -> "Requests"; ServiceType.TAUTULLI -> "Plex activity"
-        ServiceType.UNRAID -> "Server"; ServiceType.NAMER -> "Renamer"; else -> "Downloads"
+        ServiceType.UNRAID -> "Server"; ServiceType.NAMER -> "Renamer"; ServiceType.WHISPARR -> "Scenes"
+        ServiceType.UPTIME_KUMA -> "Uptime"; ServiceType.STASH -> "Stash"; else -> "Downloads"
     }
 }
 

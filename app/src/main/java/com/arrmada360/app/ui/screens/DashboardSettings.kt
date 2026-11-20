@@ -166,7 +166,7 @@ fun DashboardScreen(nav: Navigator) {
                     if (c != null) ServiceTheme(c.type, ConfigStore.amoled) { DiscoverTab(tab == 0, c, nav) }
                     else DiscoverTab(tab == 0, null, nav)
                 }
-                2 -> CombinedCalendar(services.filter { it.type.isArr }, nav)
+                2 -> CombinedCalendar(services.filter { it.type.isArr && it.type != ServiceType.WHISPARR }, nav)
                 else -> ServerInfoTab(services, nav)
             }
         }
@@ -467,7 +467,7 @@ fun ServerInfoTab(services: List<ServiceConfig>, nav: Navigator) {
         }
         return
     }
-    val arrs = services.filter { it.type.isArr }
+    val arrs = services.filter { it.type.isArr && it.type != ServiceType.WHISPARR }
     val unraids = services.filter { it.type == ServiceType.UNRAID }
     val downloaders = services.filter { it.type.isDownloader }
     LazyColumn(contentPadding = PaddingValues(bottom = 40.dp)) {

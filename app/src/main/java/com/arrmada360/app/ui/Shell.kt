@@ -245,7 +245,10 @@ private fun RouteContent(r: Route, nav: Navigator) {
 @Composable
 private fun ServiceRoot(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () -> Unit) {
     when {
+        cfg.type == ServiceType.WHISPARR -> com.arrmada360.app.ui.screens.WhisparrGate(cfg) { ArrScreen(cfg, nav, isRoot, back) }
         cfg.type.isArr -> ArrScreen(cfg, nav, isRoot, back)
+        cfg.type == ServiceType.UPTIME_KUMA -> com.arrmada360.app.ui.screens.KumaScreen(cfg, nav, isRoot, back)
+        cfg.type == ServiceType.STASH -> com.arrmada360.app.ui.screens.StashScreen(cfg, nav, isRoot, back)
         cfg.type.isDownloader -> DownloadsScreen(cfg, nav, isRoot, back)
         cfg.type.isIndexer -> IndexerScreen(cfg, nav, isRoot, back)
         cfg.type == ServiceType.SEERR -> SeerrScreen(cfg, nav, isRoot, back)

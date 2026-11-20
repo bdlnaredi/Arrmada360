@@ -111,7 +111,7 @@ class NotifyWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         val key = "seen_" + c.id
         val seen = ConfigStore.getString(key)
         when {
-            c.type.isArr -> {
+            c.type.isArr && c.type != ServiceType.WHISPARR -> {
                 val pref = when (c.type) {
                     ServiceType.RADARR -> Pref.NOTIFY_RADARR; ServiceType.SONARR -> Pref.NOTIFY_SONARR
                     ServiceType.LIDARR -> Pref.NOTIFY_LIDARR; else -> Pref.NOTIFY_READARR

@@ -1,5 +1,7 @@
 package com.arrmada360.app.ui.screens
 
+import com.arrmada360.app.api.arrType
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -140,7 +142,7 @@ fun ArrScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () -> U
     val api = remember(cfg) { ArrApi(cfg) }
     var tab by rememberSaveable(cfg.id) { mutableIntStateOf(0) }
     var libView by rememberSaveable(cfg.id + "lib") { mutableIntStateOf(0) }
-    val libWord = if (cfg.type == ServiceType.RADARR) "Movies" else api.itemWord.let { if (it == "Series") "Series" else it + "s" }
+    val libWord = if (cfg.arrType == ServiceType.RADARR) "Movies" else api.itemWord.let { if (it == "Series") "Series" else it + "s" }
     val bottom = listOf(
         BottomTab("Library", Icons.Filled.VideoLibrary),
         BottomTab("Queue", Icons.Filled.Download),
@@ -164,12 +166,12 @@ fun ArrScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () -> U
                     DropdownMenuItem(text = { Text("RSS sync") }, onClick = { menu = false; run("RSS sync started") { api.runTask("RssSync") } })
                     DropdownMenuItem(text = { Text("Search all missing") }, onClick = {
                         menu = false
-                        val n = when (cfg.type) { ServiceType.SONARR -> "MissingEpisodeSearch"; ServiceType.RADARR -> "MissingMoviesSearch"; ServiceType.LIDARR -> "MissingAlbumSearch"; else -> "MissingBookSearch" }
+                        val n = when (cfg.arrType) { ServiceType.SONARR -> "MissingEpisodeSearch"; ServiceType.RADARR -> "MissingMoviesSearch"; ServiceType.LIDARR -> "MissingAlbumSearch"; else -> "MissingBookSearch" }
                         run("Searching for all missing") { api.runTask(n) }
                     })
                     DropdownMenuItem(text = { Text("Refresh & scan all") }, onClick = {
                         menu = false
-                        val n = when (cfg.type) { ServiceType.SONARR -> "RefreshSeries"; ServiceType.RADARR -> "RefreshMovie"; ServiceType.LIDARR -> "RefreshArtist"; else -> "RefreshAuthor" }
+                        val n = when (cfg.arrType) { ServiceType.SONARR -> "RefreshSeries"; ServiceType.RADARR -> "RefreshMovie"; ServiceType.LIDARR -> "RefreshArtist"; else -> "RefreshAuthor" }
                         run("Refresh started") { api.runTask(n) }
                     })
                     DropdownMenuItem(text = { Text("Refresh downloads") }, onClick = { menu = false; run("Checking downloads") { api.runTask("RefreshMonitoredDownloads") } })
@@ -209,9 +211,10 @@ fun ArrServerTab(api: ArrApi, nav: Navigator) {
     val uri = androidx.compose.ui.platform.LocalUriHandler.current
     val cfg = api.cfg
     val t = cfg.type
+    val at = cfg.arrType
     val st = rememberLoadable(cfg, "srvstatus") { api.systemStatus() }
     val health = rememberLoadable(cfg, "srvhealth") { try { api.healthIssues() } catch (e: Exception) { emptyList() } }
-    val (missingTask, refreshTask, libWord) = when (t) {
+    val (missingTask, refreshTask, libWord) = when (at) {
         ServiceType.SONARR -> Triple("MissingEpisodeSearch", "RefreshSeries", "series")
         ServiceType.RADARR -> Triple("MissingMoviesSearch", "RefreshMovie", "movies")
         ServiceType.LIDARR -> Triple("MissingAlbumSearch", "RefreshArtist", "artists")
@@ -227,6 +230,7 @@ fun ArrServerTab(api: ArrApi, nav: Navigator) {
             }
         }
         item { MenuRow(Icons.Filled.Public, "View on web", "Open ${t.label} in your browser", t.tint2, external = true) { uri.openUri(cfg.baseUrl) } }
+        if (t.privateArt) item { Box(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) { com.arrmada360.app.ui.PrivateArtSwitch(cfg) } }
         if (t.isArr) {
             item { MenuRow(Icons.Filled.DriveFileMove, "Manual import", "Import files from a folder or a stuck download", Rainbow[1]) { nav.push(Route.ManualImport(cfg.id)) } }
             item { MenuRow(Icons.Filled.RssFeed, "RSS sync", "Check your indexers for new releases now", Rainbow[3], arrow = false) { run("RSS sync started") { api.runTask("RssSync") } } }
@@ -625,7 +629,7 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                         AsyncImage(model = m.fanart ?: m.poster, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background))))
                         Row(Modifier.align(Alignment.BottomStart).padding(16.dp), verticalAlignment = Alignment.Bottom) {
-                            Poster(m.poster, Modifier.width(100.dp), ratio = if (cfg.type == ServiceType.LIDARR) 1f else 2f / 3f, fallback = m.title)
+                            Poster(m.poster, Modifier.width(100.dp), ratio = if (cfg.arrType == ServiceType.LIDARR) 1f else 2f / 3f, fallback = m.title)
                             Spacer(Modifier.width(14.dp))
                             Column {
                                 Text(m.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.ExtraBold, color = Color.White)
@@ -646,7 +650,7 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                             run(if (m.monitored) "Unmonitored" else "Monitored", { item.load(true) }) { api.setMonitored(itemId, !m.monitored) }
                         }
                         ActionButton(Icons.Filled.Search, "Auto search") { run("Search started") { api.searchItem(itemId) } }
-                        if (cfg.type != ServiceType.SONARR) ActionButton(Icons.Filled.ManageSearch, "Interactive") {
+                        if (cfg.arrType != ServiceType.SONARR) ActionButton(Icons.Filled.ManageSearch, "Interactive") {
                             releases = m.title to api.releaseQueryForItem(itemId)
                         }
                         ActionButton(Icons.Filled.Refresh, "Refresh") { run("Refresh & scan started") { api.refreshItem(itemId) } }
@@ -662,7 +666,7 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                 item {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         InfoLine("Path", m.raw.optString("path"))
-                        if (cfg.type == ServiceType.RADARR) {
+                        if (cfg.arrType == ServiceType.RADARR) {
                             val f = m.raw.optJSONObject("movieFile")
                             if (f != null) {
                                 InfoLine("File", f.optString("relativePath"))
@@ -670,7 +674,7 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                             }
                             InfoLine("Availability", m.raw.optString("minimumAvailability"))
                         }
-                        if (cfg.type == ServiceType.SONARR) {
+                        if (cfg.arrType == ServiceType.SONARR) {
                             InfoLine("Type", m.raw.optString("seriesType"))
                             InfoLine("Next airing", fmtDate(m.raw.optString("nextAiring"), true))
                         }
@@ -693,7 +697,7 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                         list == null -> item { Box(Modifier.fillMaxWidth().height(80.dp)) { LoadingBox() } }
                         else -> {
                             val groups = list.groupBy { it.groupKey to it.group }
-                            val singleGroup = groups.size == 1 && cfg.type != ServiceType.SONARR
+                            val singleGroup = groups.size == 1 && cfg.arrType != ServiceType.SONARR
                             groups.forEach { (g, children) ->
                                 val (key, label) = g
                                 val open = singleGroup || key in expanded
@@ -701,16 +705,16 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                                     GroupHeader(
                                         label = label, children = children, open = open,
                                         onToggle = { expanded = if (open) expanded - key else expanded + key },
-                                        seasonMonitored = if (cfg.type == ServiceType.SONARR) seasonMonitored(m, key) else null,
+                                        seasonMonitored = if (cfg.arrType == ServiceType.SONARR) seasonMonitored(m, key) else null,
                                         onMonitor = { mon ->
-                                            if (cfg.type == ServiceType.SONARR) run(if (mon) "Season monitored" else "Season unmonitored", { item.load(true); kids.load(true) }) { api.setSeasonMonitored(itemId, key, mon) }
+                                            if (cfg.arrType == ServiceType.SONARR) run(if (mon) "Season monitored" else "Season unmonitored", { item.load(true); kids.load(true) }) { api.setSeasonMonitored(itemId, key, mon) }
                                             else run("Updated", { kids.load(true) }) { api.setChildrenMonitored(children.map { it.id }, mon) }
                                         },
                                         onSearch = {
-                                            if (cfg.type == ServiceType.SONARR) run("Season search started") { api.searchSeason(itemId, key) }
+                                            if (cfg.arrType == ServiceType.SONARR) run("Season search started") { api.searchSeason(itemId, key) }
                                             else run("Search started") { api.searchChildren(children.map { it.id }) }
                                         },
-                                        onInteractive = if (cfg.type == ServiceType.SONARR) ({ releases = "${m.title} – $label" to mapOf("seriesId" to itemId, "seasonNumber" to key) }) else null,
+                                        onInteractive = if (cfg.arrType == ServiceType.SONARR) ({ releases = "${m.title} – $label" to mapOf("seriesId" to itemId, "seasonNumber" to key) }) else null,
                                     )
                                 }
                                 if (open) items(children, key = { "k" + it.id }) { c ->
@@ -930,7 +934,7 @@ fun ArrAddContent(cfg: ServiceConfig, initialTerm: String, nav: Navigator, onAdd
     Column(Modifier.fillMaxSize().imePadding()) {
         OutlinedTextField(
             term, { term = it }, singleLine = true,
-            placeholder = { Text(when (cfg.type) { ServiceType.SONARR -> "Show name or tvdb:12345"; ServiceType.RADARR -> "Movie name, tmdb:123 or imdb:tt…"; ServiceType.LIDARR -> "Artist name"; else -> "Author name" }) },
+            placeholder = { Text(when (cfg.arrType) { ServiceType.SONARR -> "Show name or tvdb:12345"; ServiceType.RADARR -> "Movie name, tmdb:123 or imdb:tt…"; ServiceType.LIDARR -> "Artist name"; else -> "Author name" }) },
             leadingIcon = { Icon(Icons.Filled.Search, null) },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { submitted = term.trim() }),
@@ -943,7 +947,7 @@ fun ArrAddContent(cfg: ServiceConfig, initialTerm: String, nav: Navigator, onAdd
                     val inLib = m.id > 0
                     Panel(Modifier.fillMaxWidth(), tint = if (inLib) Good else null, onClick = { if (inLib) nav.push(Route.ArrDetail(cfg.id, m.id)) else adding = m }) {
                         Row(Modifier.padding(10.dp)) {
-                            Poster(m.poster, Modifier.width(70.dp), ratio = if (cfg.type == ServiceType.LIDARR) 1f else 2f / 3f, fallback = m.title)
+                            Poster(m.poster, Modifier.width(70.dp), ratio = if (cfg.arrType == ServiceType.LIDARR) 1f else 2f / 3f, fallback = m.title)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(m.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)

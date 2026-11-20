@@ -292,7 +292,22 @@ data class StreamSession(
     val quality: String,
     val bandwidthKbps: Long,
     val location: String,
+    val art: String? = null,
+    val userThumb: String? = null,
+    val offsetMs: Long = 0,
+    val durationMs: Long = 0,
+    val video: String = "",
+    val audio: String = "",
+    val ip: String = "",
+    val product: String = "",
+    val mediaType: String = "",
+    val container: String = "",
 )
+
+data class TActivity(val sessions: List<StreamSession>, val total: Long, val lan: Long, val wan: Long, val direct: Int, val directStream: Int, val transcode: Int)
+data class TopEntry(val title: String, val thumb: String?, val plays: Int, val duration: Long, val users: Int)
+data class TopGroup(val id: String, val title: String, val rows: List<TopEntry>)
+data class PlaysByDate(val days: List<String>, val series: List<Pair<String, List<Long>>>)
 
 data class PlayHistory(val user: String, val title: String, val date: Long, val duration: Long, val percent: Int, val player: String, val thumb: String?)
 
@@ -336,6 +351,78 @@ class TautulliApi(val cfg: ServiceConfig) {
         }
         return list to d.long("total_bandwidth")
     }
+
+    suspend fun activityFull(): TActivity {
+        val d = cmd("get_activity").obj("data") ?: JSONObject()
+        val list = d.arr("sessions").objects().map { s ->
+            val type = s.str("media_type")
+            val title = when (type) { "episode" -> s.str("grandparent_title"); else -> s.str("title") }
+            val sub = when (type) {
+                "episode" -> "S%s · E%s · %s".format(s.str("parent_media_index"), s.str("media_index"), s.str("title"))
+                "track" -> "${s.str("grandparent_title")} — ${s.str("parent_title")}"
+                else -> s.str("year")
+            }
+            val thumb = if (type == "episode") s.str("grandparent_thumb") else s.str("thumb")
+            val res = s.str("stream_video_full_resolution").ifEmpty { s.str("video_full_resolution") }
+            val vdec = s.str("video_decision").replaceFirstChar { it.uppercase() }
+            val adec = s.str("audio_decision").replaceFirstChar { it.uppercase() }
+            StreamSession(
+                sessionId = s.str("session_id"), user = s.str("friendly_name"), title = title, subtitle = sub, thumb = imageUrl(thumb),
+                progress = s.int("progress_percent"), state = s.str("state"), player = s.str("player"),
+                decision = s.str("transcode_decision").replaceFirstChar { it.uppercase() }.replace("Copy", "Direct Stream"),
+                quality = s.str("quality_profile"), bandwidthKbps = s.long("bandwidth"), location = s.str("location").uppercase(),
+                art = artUrl(s.str("art").ifEmpty { s.str("grandparent_art") }), userThumb = s.str("user_thumb").ifEmpty { null }?.takeIf { it.startsWith("http") },
+                offsetMs = s.long("view_offset"), durationMs = s.long("duration"),
+                video = listOf(res, s.str("stream_video_codec").uppercase(), vdec).filter { it.isNotBlank() }.joinToString(" · "),
+                audio = listOf(s.str("stream_audio_codec").uppercase(), s.str("stream_audio_channel_layout"), adec).filter { it.isNotBlank() }.joinToString(" · "),
+                ip = s.str("ip_address"), product = "${s.str("product")} · ${s.str("platform")}", mediaType = type,
+                container = s.str("stream_container").uppercase(),
+            )
+        }
+        return TActivity(list, d.long("total_bandwidth"), d.long("lan_bandwidth"), d.long("wan_bandwidth"),
+            d.int("stream_count_direct_play"), d.int("stream_count_direct_stream"), d.int("stream_count_transcode"))
+    }
+
+    fun artUrl(art: String): String? = if (art.isEmpty()) null
+    else buildUrl("${cfg.baseUrl}/api/v2", mapOf("apikey" to cfg.apiKey, "cmd" to "pms_image_proxy", "img" to art, "width" to 900, "height" to 500, "opacity" to 100)).toString()
+
+    suspend fun topStats(days: Int): List<TopGroup> =
+        (cmd("get_home_stats", mapOf("time_range" to days, "stats_count" to 10)).optJSONArray("data") ?: JSONArray()).objects().mapNotNull { st ->
+            val id = st.str("stat_id")
+            val title = when (id) {
+                "top_movies" -> "Most watched movies"; "top_tv" -> "Most watched shows"; "top_music" -> "Most played artists"
+                "popular_movies" -> "Popular movies"; "popular_tv" -> "Popular shows"
+                "top_users" -> "Most active users"; "top_platforms" -> "Top platforms"
+                else -> return@mapNotNull null
+            }
+            val rows = st.arr("rows").objects().map { r ->
+                val name = r.str("title").ifEmpty { r.str("friendly_name") }.ifEmpty { r.str("platform") }
+                val img = when (id) {
+                    "top_users" -> r.str("user_thumb").takeIf { it.startsWith("http") }
+                    "top_platforms" -> null
+                    "top_tv", "popular_tv" -> imageUrl(r.str("grandparent_thumb").ifEmpty { r.str("thumb") })
+                    else -> imageUrl(r.str("thumb"))
+                }
+                TopEntry(name, img, r.int("total_plays"), r.long("total_duration"), r.int("users_watched"))
+            }
+            if (rows.isEmpty()) null else TopGroup(id, title, rows)
+        }
+
+    suspend fun playsByDate(days: Int): PlaysByDate {
+        val d = cmd("get_plays_by_date", mapOf("time_range" to days)).obj("data") ?: JSONObject()
+        val cats = d.arr("categories").let { a -> (0 until a.length()).map { a.optString(it) } }
+        val series = d.arr("series").objects().map { o -> o.str("name") to o.arr("data").let { a -> (0 until a.length()).map { a.optLong(it) } } }
+        return PlaysByDate(cats, series)
+    }
+
+    suspend fun historyFull(length: Int = 100): List<PlayHistory> =
+        (cmd("get_history", mapOf("length" to length)).obj("data")?.arr("data") ?: JSONArray()).objects().map { h ->
+            PlayHistory(
+                user = h.str("friendly_name"), title = h.str("full_title"), date = h.long("date"), duration = h.long("play_duration", h.long("duration")),
+                percent = h.int("percent_complete"), player = "${h.str("player")} · ${h.str("transcode_decision").replaceFirstChar { it.uppercase() }}",
+                thumb = imageUrl(if (h.str("media_type") == "episode") h.str("grandparent_thumb") else h.str("thumb")),
+            )
+        }
 
     suspend fun history(): List<PlayHistory> =
         (cmd("get_history", mapOf("length" to 50)).obj("data")?.arr("data") ?: JSONArray()).objects().map { h ->
@@ -560,7 +647,9 @@ class UnraidApi(val cfg: ServiceConfig) {
 // ======================= Connection test =======================
 object ServiceTester {
     suspend fun test(cfg: ServiceConfig): String = when (cfg.type) {
-        ServiceType.SONARR, ServiceType.RADARR, ServiceType.LIDARR, ServiceType.READARR -> ArrApi(cfg).status()
+        ServiceType.SONARR, ServiceType.RADARR, ServiceType.LIDARR, ServiceType.READARR, ServiceType.WHISPARR -> ArrApi(cfg).status()
+        ServiceType.UPTIME_KUMA -> KumaApi(cfg).status()
+        ServiceType.STASH -> StashApi(cfg).status()
         ServiceType.PROWLARR -> ProwlarrApi(cfg).status()
         ServiceType.JACKETT -> JackettApi(cfg).status()
         ServiceType.SEERR -> SeerrApi(cfg).status()

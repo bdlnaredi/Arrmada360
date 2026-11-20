@@ -236,7 +236,7 @@ private class UniversalResults(val library: List<Pair<ServiceConfig, List<MediaI
 fun UniversalSearchScreen(nav: Navigator, initial: String, isRoot: Boolean, back: () -> Unit) {
     var term by rememberSaveable { mutableStateOf(initial) }
     var submitted by rememberSaveable { mutableStateOf(initial) }
-    val arrs = ConfigStore.services.filter { it.type.isArr }
+    val arrs = ConfigStore.services.filter { it.type.isArr && it.type != com.arrmada360.app.data.ServiceType.WHISPARR }
     val indexers = ConfigStore.services.filter { it.type.isIndexer }
     val res = rememberLoadable(submitted) {
         if (submitted.isBlank()) UniversalResults(emptyList(), emptyList())
@@ -308,7 +308,7 @@ private fun MediaRow(items: List<MediaItem>, onClick: (MediaItem) -> Unit) {
 /** Live results for the dashboard search bar: matches in your libraries, then new titles you can add. */
 @Composable
 fun SearchResults(query: String, nav: Navigator) {
-    val arrs = ConfigStore.services.filter { it.type.isArr }
+    val arrs = ConfigStore.services.filter { it.type.isArr && it.type != com.arrmada360.app.data.ServiceType.WHISPARR }
     val res = rememberLoadable(query, "dashsearch") {
         coroutineScope {
             val lib = arrs.map { c -> async { c to try { ArrApi(c).library().filter { it.title.contains(query, true) }.take(15) } catch (e: Exception) { emptyList() } } }

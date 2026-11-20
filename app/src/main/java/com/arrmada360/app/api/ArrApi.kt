@@ -114,8 +114,26 @@ data class DiskSpace(val path: String, val label: String, val free: Long, val to
 /**
  * One client for Sonarr, Radarr, Lidarr and Readarr – they share the same REST design.
  */
+/** Whisparr v2 is built on Sonarr, v3 on Radarr: remember which one each instance runs. */
+object Whisparr {
+    fun known(cfg: ServiceConfig) = com.arrmada360.app.data.ConfigStore.getString("whisparrFlavor_" + cfg.id).isNotEmpty()
+    fun flavor(cfg: ServiceConfig): ServiceType =
+        if (com.arrmada360.app.data.ConfigStore.getString("whisparrFlavor_" + cfg.id) == "RADARR") ServiceType.RADARR else ServiceType.SONARR
+    fun remember(cfg: ServiceConfig, version: String) {
+        val major = version.substringBefore('.').toIntOrNull() ?: 2
+        com.arrmada360.app.data.ConfigStore.putString("whisparrFlavor_" + cfg.id, if (major >= 3) "RADARR" else "SONARR")
+    }
+}
+
+/** The *arr engine an instance speaks (Whisparr maps to Sonarr or Radarr). */
+val ServiceConfig.arrType: ServiceType get() = if (type == ServiceType.WHISPARR) Whisparr.flavor(this) else type
+
+/** Adult artwork is only shown when switched on for that instance. */
+fun ServiceConfig.artAllowed(): Boolean = !type.privateArt ||
+    com.arrmada360.app.data.ConfigStore.flag((if (type == ServiceType.NAMER) "namerArt_" else "art_") + id)
+
 class ArrApi(val cfg: ServiceConfig) {
-    val type: ServiceType = cfg.type
+    val type: ServiceType = cfg.arrType
     private val ver = if (type == ServiceType.SONARR || type == ServiceType.RADARR) "v3" else "v1"
     private val client = Http.client(cfg.trustAllCerts)
 
@@ -213,7 +231,8 @@ class ArrApi(val cfg: ServiceConfig) {
 
     suspend fun status(): String {
         val o = JSONObject(get("system/status"))
-        return "${o.str("appName", type.label)} ${o.str("version")}"
+        if (cfg.type == ServiceType.WHISPARR) Whisparr.remember(cfg, o.str("version"))
+        return "${o.str("appName", cfg.type.label)} ${o.str("version")}"
     }
 
     // ---------------- images ----------------
@@ -223,7 +242,7 @@ class ArrApi(val cfg: ServiceConfig) {
     }
 
     fun image(o: JSONObject?, vararg types: String): String? {
-        if (o == null) return null
+        if (o == null || !cfg.artAllowed()) return null
         val imgs = o.arr("images").objects()
         for (t in types) {
             val img = imgs.firstOrNull { it.str("coverType").equals(t, true) } ?: continue

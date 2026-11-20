@@ -809,3 +809,23 @@ fun relativeDay(d: LocalDate?): String {
         else -> d.format(dayFmt)
     }
 }
+
+
+/** On/off switch for adult artwork (Whisparr, Stash, Namer), stored per instance. Off by default. */
+@Composable
+fun PrivateArtSwitch(cfg: com.arrmada360.app.data.ServiceConfig, compact: Boolean = false) {
+    val key = (if (cfg.type == ServiceType.NAMER) "namerArt_" else "art_") + cfg.id
+    var on by remember(key) { mutableStateOf(com.arrmada360.app.data.ConfigStore.flag(key)) }
+    val set = { v: Boolean -> on = v; com.arrmada360.app.data.ConfigStore.setFlag(key, v) }
+    Panel(Modifier.fillMaxWidth(), tint = if (on) Good else cfg.type.tint, onClick = { set(!on) }) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = if (compact) 6.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(androidx.compose.material.icons.Icons.Filled.Image, null, tint = if (on) Good else MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Show artwork", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                if (!compact) Text(if (on) "Posters and screenshots are shown" else "Off – lists are text only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            androidx.compose.material3.Switch(on, { set(it) })
+        }
+    }
+}
