@@ -1,6 +1,11 @@
 package com.arrmada360.app.ui.screens
 
 import com.arrmada360.app.api.arrType
+import com.arrmada360.app.ui.*
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.combinedClickable
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -383,8 +388,17 @@ fun LibraryTab(api: ArrApi, nav: Navigator) {
     var filter by rememberSaveable { mutableIntStateOf(0) }
     var sortMenu by remember { mutableStateOf(false) }
     val filters = listOf("All", "Monitored", "Missing", "Complete", "Unmonitored")
+    var selected by remember { mutableStateOf(setOf<Int>()) }
+    var bulk by remember { mutableStateOf<String?>(null) }
+    val run = rememberRunner()
+    androidx.activity.compose.BackHandler(selected.isNotEmpty()) { selected = emptySet() }
 
     Column {
+        if (selected.isNotEmpty()) BulkBar(selected.size,
+            onAll = { selected = (l.data ?: emptyList()).map { it.id }.toSet() },
+            onClear = { selected = emptySet() },
+            onAction = { bulk = it },
+        ) else
         Row(Modifier.padding(start = 12.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 query, { query = it }, placeholder = { Text("Filter library") }, singleLine = true,
@@ -433,26 +447,139 @@ fun LibraryTab(api: ArrApi, nav: Navigator) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                items(shown, key = { it.id }) { m -> PosterTile(m) { if (ConfigStore.flag(com.arrmada360.app.data.Pref.AUTO_CLEAR_SEARCH)) query = ""; nav.push(Route.ArrDetail(api.cfg.id, m.id)) } }
+                items(shown, key = { it.id }) { m ->
+                    PosterTile(m, selected = m.id in selected, onLong = { selected = if (m.id in selected) selected - m.id else selected + m.id }) {
+                        if (selected.isNotEmpty()) selected = if (m.id in selected) selected - m.id else selected + m.id
+                        else { if (ConfigStore.flag(com.arrmada360.app.data.Pref.AUTO_CLEAR_SEARCH)) query = ""; nav.push(Route.ArrDetail(api.cfg.id, m.id)) }
+                    }
+                }
+            }
+        }
+    }
+    BulkDialogs(api, selected, bulk) { reload -> bulk = null; if (reload) { selected = emptySet(); l.load(true) } }
+}
+
+@Composable
+private fun BulkBar(count: Int, onAll: () -> Unit, onClear: () -> Unit, onAction: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)).padding(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onClear) { Icon(Icons.Filled.Close, "Clear selection") }
+            Text("$count selected", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            TextButton(onClick = onAll) { Text("Select all") }
+        }
+        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val acts = listOf(
+                Triple("monitor", "Monitor", Icons.Filled.Bookmark), Triple("unmonitor", "Unmonitor", Icons.Filled.BookmarkBorder),
+                Triple("search", "Search", Icons.Filled.Search), Triple("refresh", "Refresh", Icons.Filled.Refresh),
+                Triple("quality", "Quality", Icons.Filled.HighQuality), Triple("tag", "Tags", Icons.Filled.LocalOffer),
+                Triple("delete", "Delete", Icons.Filled.Delete),
+            )
+            items(acts) { (k, label, icon) ->
+                androidx.compose.material3.AssistChip(onClick = { onAction(k) }, label = { Text(label) },
+                    leadingIcon = { Icon(icon, null, tint = if (k == "delete") Bad else MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) })
             }
         }
     }
 }
 
 @Composable
-private fun PosterTile(m: MediaItem, onClick: () -> Unit) {
+private fun BulkDialogs(api: ArrApi, ids: Set<Int>, action: String?, done: (Boolean) -> Unit) {
+    val run = rememberRunner()
+    val n = ids.size
+    val word = api.itemWord.lowercase().let { if (n == 1) it else if (it == "series") it else it + "s" }
+    when (action) {
+        "monitor", "unmonitor", "search", "refresh" -> LaunchedEffect(action) {
+            val list = ids.toList()
+            done(false)
+            run(when (action) { "monitor" -> "$n $word monitored"; "unmonitor" -> "$n $word unmonitored"; "search" -> "Searching $n $word"; else -> "Refreshing $n $word" }, { done(true) }) {
+                when (action) {
+                    "monitor" -> api.bulkEdit(list, monitored = true)
+                    "unmonitor" -> api.bulkEdit(list, monitored = false)
+                    "search" -> api.bulkSearch(list)
+                    else -> api.bulkRefresh(list)
+                }
+            }
+        }
+        "quality" -> {
+            val profiles = rememberLoadable(api.cfg, "bulkqp") { api.qualityProfiles() }
+            AlertDialog(
+                onDismissRequest = { done(false) }, title = { Text("Quality profile for $n $word") },
+                text = {
+                    Column {
+                        val p = profiles.data
+                        if (p == null) Text(profiles.error ?: "Loading…")
+                        else p.forEach { pr -> TextButton(onClick = { done(false); run("Quality profile set to ${pr.name}", { done(true) }) { api.bulkEdit(ids.toList(), qualityProfileId = pr.id) } }) { Text(pr.name) } }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { done(false) }) { Text("Cancel") } },
+            )
+        }
+        "tag" -> {
+            val tags = rememberLoadable(api.cfg, "bulktags") { api.tags() }
+            var newTag by remember { mutableStateOf("") }
+            var remove by remember { mutableStateOf(false) }
+            AlertDialog(
+                onDismissRequest = { done(false) }, title = { Text("Tags for $n $word") },
+                text = {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.FilterChip(!remove, { remove = false }, label = { Text("Add tag") })
+                            Spacer(Modifier.width(8.dp))
+                            androidx.compose.material3.FilterChip(remove, { remove = true }, label = { Text("Remove tag") })
+                        }
+                        val t = tags.data
+                        if (t == null) Text(tags.error ?: "Loading…")
+                        else androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            t.forEach { tag ->
+                                androidx.compose.material3.AssistChip(onClick = {
+                                    done(false)
+                                    run(if (remove) "Removed tag ${tag.name}" else "Added tag ${tag.name}", { done(true) }) {
+                                        if (remove) api.bulkEdit(ids.toList(), removeTags = listOf(tag.id)) else api.bulkEdit(ids.toList(), addTags = listOf(tag.id))
+                                    }
+                                }, label = { Text(tag.name) })
+                            }
+                        }
+                        if (!remove) {
+                            OutlinedTextField(newTag, { newTag = it }, singleLine = true, label = { Text("New tag") }, modifier = Modifier.fillMaxWidth())
+                            TextButton(enabled = newTag.isNotBlank(), onClick = {
+                                val label = newTag; done(false)
+                                run("Added tag $label", { done(true) }) { val tg = api.createTag(label); api.bulkEdit(ids.toList(), addTags = listOf(tg.id)) }
+                            }) { Text("Create & add") }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { done(false) }) { Text("Cancel") } },
+            )
+        }
+        "delete" -> {
+            var files by remember { mutableStateOf(false) }
+            AlertDialog(
+                onDismissRequest = { done(false) }, title = { Text("Delete $n $word?") },
+                text = { Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(files, { files = it }); Text("Also delete files from disk") } },
+                confirmButton = { TextButton(onClick = { done(false); run("Deleted $n $word", { done(true) }) { api.bulkDelete(ids.toList(), files) } }) { Text("Delete", color = Bad) } },
+                dismissButton = { TextButton(onClick = { done(false) }) { Text("Cancel") } },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PosterTile(m: MediaItem, selected: Boolean = false, onLong: (() -> Unit)? = null, onClick: () -> Unit) {
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
     val scale by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.94f else 1f, label = "tile")
     val color = when { m.complete -> Good; !m.monitored -> Color.Gray; m.raw.optString("status") == "continuing" -> MaterialTheme.colorScheme.primary; else -> Bad }
     Column(
         Modifier.graphicsLayer { scaleX = scale; scaleY = scale }
-            .clickable(interactionSource = src, indication = androidx.compose.material3.ripple(), onClick = onClick),
+            .combinedClickable(interactionSource = src, indication = androidx.compose.material3.ripple(), onLongClick = onLong, onClick = onClick),
     ) {
-        Box(Modifier.clip(RoundedCornerShape(12.dp)).border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(12.dp))) {
+        Box(Modifier.clip(RoundedCornerShape(12.dp)).border(if (selected) 3.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else color.copy(alpha = 0.45f), RoundedCornerShape(12.dp))) {
             Poster(m.poster, Modifier.fillMaxWidth(), ratio = if (m.raw.has("artistName")) 1f else 2f / 3f, corner = 12.dp, fallback = m.title)
             if (!m.monitored) Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f)))
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.7f)))))
+            if (selected) Box(Modifier.matchParentSize().background(MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.CheckCircle, null, tint = Color.White, modifier = Modifier.size(40.dp))
+            }
             Box(Modifier.align(Alignment.TopEnd).padding(5.dp)) {
                 Icon(if (m.monitored) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder, null, tint = if (m.monitored) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
             }
@@ -478,14 +605,21 @@ private fun PosterTile(m: MediaItem, onClick: () -> Unit) {
 fun CalendarTab(api: ArrApi, nav: Navigator, wanted: Boolean) {
     val l = rememberLoadable(api.cfg, wanted) { if (wanted) api.wanted() else api.calendar() }
     val run = rememberRunner()
+    var interactive by remember { mutableStateOf<Pair<String, Map<String, Any?>>?>(null) }
+    interactive?.let { (t, q) -> ReleasesSheet(api, t, q) { interactive = null } }
     LoadableContent(l, empty = { it.isEmpty() }, emptyText = if (wanted) "Nothing missing 🎉" else "Nothing coming up in the next 30 days") { list ->
         LazyColumn(contentPadding = PaddingValues(bottom = 32.dp)) {
             if (wanted) {
                 items(list, key = { "w" + it.id }) { e ->
                     CalRow(e, onClick = { nav.push(Route.ArrDetail(api.cfg.id, e.parentId)) }) {
-                        IconButton(onClick = {
-                            run("Search started") { if (api.type == ServiceType.RADARR) api.searchItem(e.id) else api.searchChildren(listOf(e.id)) }
-                        }) { Icon(Icons.Filled.Search, "Search") }
+                        Row {
+                            IconButton(onClick = { interactive = e.title + " " + e.subtitle to (if (api.type == ServiceType.RADARR) api.releaseQueryForItem(e.id) else api.releaseQueryForChild(e.id)) }) {
+                                Icon(Icons.Filled.ManageSearch, "Interactive search")
+                            }
+                            IconButton(onClick = {
+                                run("Search started") { if (api.type == ServiceType.RADARR) api.searchItem(e.id) else api.searchChildren(listOf(e.id)) }
+                            }) { Icon(Icons.Filled.Search, "Search") }
+                        }
                     }
                 }
             } else {
@@ -495,6 +629,9 @@ fun CalendarTab(api: ArrApi, nav: Navigator, wanted: Boolean) {
                     items(entries, key = { "c" + it.id + it.date }) { e ->
                         CalRow(e, onClick = { nav.push(Route.ArrDetail(api.cfg.id, e.parentId)) }) {
                             if (e.hasFile) Icon(Icons.Filled.CheckCircle, null, tint = Good, modifier = Modifier.padding(12.dp))
+                            else IconButton(onClick = { interactive = e.title + " " + e.subtitle to (if (api.type == ServiceType.RADARR) api.releaseQueryForItem(e.id) else api.releaseQueryForChild(e.id)) }) {
+                                Icon(Icons.Filled.ManageSearch, "Interactive search")
+                            }
                         }
                     }
                 }
@@ -611,6 +748,9 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
     var confirmDelete by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(setOf<Int>()) }
     var overviewOpen by remember { mutableStateOf(false) }
+    var seasonPick by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
 
     AppScaffold(
         title = item.data?.title ?: "Loading…", isRoot = false, onBack = back,
@@ -650,12 +790,14 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                             run(if (m.monitored) "Unmonitored" else "Monitored", { item.load(true) }) { api.setMonitored(itemId, !m.monitored) }
                         }
                         ActionButton(Icons.Filled.Search, "Auto search") { run("Search started") { api.searchItem(itemId) } }
-                        if (cfg.arrType != ServiceType.SONARR) ActionButton(Icons.Filled.ManageSearch, "Interactive") {
-                            releases = m.title to api.releaseQueryForItem(itemId)
+                        ActionButton(Icons.Filled.ManageSearch, "Interactive") {
+                            if (cfg.arrType == ServiceType.SONARR) seasonPick = true else releases = m.title to api.releaseQueryForItem(itemId)
                         }
+                        ActionButton(Icons.Filled.Edit, "Edit") { editing = true }
                         ActionButton(Icons.Filled.Refresh, "Refresh") { run("Refresh & scan started") { api.refreshItem(itemId) } }
                     }
                 }
+                item { FactsRow(cfg, m) }
                 if (m.overview.isNotEmpty()) item {
                     Text(
                         m.overview, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -689,6 +831,17 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                         if (genres != null && genres.length() > 0) InfoLine("Genres", (0 until genres.length()).joinToString { genres.optString(it) })
                     }
                 }
+                if (cfg.arrType == ServiceType.RADARR) {
+                    item { MovieFileCard(m) }
+                    item { CastRow(api, itemId) }
+                }
+                item {
+                    Row(Modifier.fillMaxWidth().clickable { showHistory = !showHistory }.padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        SectionTitle("History", Modifier.weight(1f))
+                        Icon(if (showHistory) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, null)
+                    }
+                }
+                if (showHistory) item { ItemHistory(api, itemId) }
                 if (api.childWord != null) {
                     val list = kids.data
                     item { SectionTitle(api.childWord ?: "") }
@@ -735,6 +888,26 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
     releases?.let { (title, q) ->
         ReleasesSheet(api, title, q) { releases = null }
     }
+
+    if (seasonPick) item.data?.let { m ->
+        val seasons = (m.raw.optJSONArray("seasons")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it)?.optInt("seasonNumber") } } ?: emptyList()).sortedDescending()
+        AlertDialog(
+            onDismissRequest = { seasonPick = false }, title = { Text("Interactive search") },
+            text = {
+                Column(Modifier.heightIn(max = 420.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                    Text("Pick a season – or open a season below to search single episodes.", style = MaterialTheme.typography.bodySmall)
+                    seasons.forEach { sn ->
+                        TextButton(onClick = { seasonPick = false; releases = "${m.title} – ${if (sn == 0) "Specials" else "Season $sn"}" to mapOf("seriesId" to itemId, "seasonNumber" to sn) }) {
+                            Text(if (sn == 0) "Specials" else "Season $sn")
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { seasonPick = false }) { Text("Cancel") } },
+        )
+    }
+
+    if (editing) item.data?.let { m -> EditItemDialog(api, m) { changed -> editing = false; if (changed) item.load(true) } }
 
     if (confirmDelete) {
         var files by remember { mutableStateOf(false) }
@@ -854,19 +1027,21 @@ fun ReleasesSheet(api: ArrApi, title: String, query: Map<String, Any?>, onDismis
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val l = rememberLoadable(api.cfg, query) { api.releases(query) }
     val run = rememberRunner()
-    var hideRejected by remember { mutableStateOf(false) }
+    var hideRejected by rememberSaveable { mutableStateOf(false) }
+    var sort by rememberSaveable { mutableIntStateOf(0) }
+    var proto by rememberSaveable { mutableIntStateOf(0) }
+    var quality by rememberSaveable { mutableStateOf("All") }
+    var text by rememberSaveable { mutableStateOf("") }
+    var confirm by remember { mutableStateOf<ReleaseEntry?>(null) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxWidth().height(640.dp)) {
+        Column(Modifier.fillMaxWidth().height(680.dp)) {
             Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Interactive search", style = MaterialTheme.typography.titleMedium)
+                    Text("Interactive search", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
-                Text("Hide rejected", style = MaterialTheme.typography.labelSmall)
-                Spacer(Modifier.width(6.dp))
-                Switch(hideRejected, { hideRejected = it })
+                IconButton(onClick = { l.load() }) { Icon(Icons.Filled.Refresh, "Search again") }
             }
-            Spacer(Modifier.height(8.dp))
             val d = l.data
             when {
                 d == null && l.error != null -> ErrorBox(l.error ?: "") { l.load() }
@@ -875,11 +1050,54 @@ fun ReleasesSheet(api: ArrApi, title: String, query: Map<String, Any?>, onDismis
                     Text("Searching your indexers… this can take a minute", style = MaterialTheme.typography.bodySmall)
                 }
                 d.isEmpty() -> EmptyBox("No releases found")
-                else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(d.filter { !hideRejected || !it.rejected }) { r -> ReleaseRow(r) { run("Grabbed – sent to download client") { api.grab(r) } } }
+                else -> {
+                    val qualities = listOf("All") + d.map { it.quality }.filter { it.isNotEmpty() }.distinct()
+                    OutlinedTextField(text, { text = it }, singleLine = true, placeholder = { Text("Filter by name, group, indexer") },
+                        leadingIcon = { Icon(Icons.Filled.FilterList, null) }, shape = RoundedCornerShape(50),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp))
+                    ChipRow(listOf("Best", "Seeders", "Size ↓", "Size ↑", "Newest"), sort, { sort = it })
+                    Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ChipRow(listOf("All", "Torrent", "Usenet"), proto, { proto = it }, Modifier.weight(1f))
+                    }
+                    Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Dropdown("Quality", qualities, quality, { it }, { quality = it }, Modifier.weight(1f))
+                        Spacer(Modifier.width(10.dp))
+                        Text("Hide rejected", style = MaterialTheme.typography.labelSmall)
+                        Spacer(Modifier.width(4.dp))
+                        Switch(hideRejected, { hideRejected = it })
+                    }
+                    val shown = d.asSequence()
+                        .filter { !hideRejected || !it.rejected }
+                        .filter { proto == 0 || it.protocol.equals(if (proto == 1) "torrent" else "usenet", true) }
+                        .filter { quality == "All" || it.quality == quality }
+                        .filter { text.isBlank() || it.title.contains(text.trim(), true) || it.indexer.contains(text.trim(), true) }
+                        .let { sq ->
+                            when (sort) {
+                                1 -> sq.sortedByDescending { it.seeders ?: -1 }
+                                2 -> sq.sortedByDescending { it.size }
+                                3 -> sq.sortedBy { it.size }
+                                4 -> sq.sortedBy { it.ageHours }
+                                else -> sq
+                            }
+                        }.toList()
+                    Text("${shown.size} of ${d.size} releases · tap to grab", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                    LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(shown, key = { it.guid + it.indexerId }) { r ->
+                            ReleaseRow(r) { if (r.rejected) confirm = r else run("Grabbed – sent to download client") { api.grab(r) } }
+                        }
+                    }
                 }
             }
         }
+    }
+    confirm?.let { r ->
+        AlertDialog(
+            onDismissRequest = { confirm = null }, title = { Text("Grab a rejected release?") },
+            text = { Column { Text(r.title, style = MaterialTheme.typography.bodySmall); Spacer(Modifier.height(6.dp)); r.rejections.forEach { Text("• $it", color = Bad, style = MaterialTheme.typography.labelSmall) } } },
+            confirmButton = { TextButton(onClick = { confirm = null; run("Grabbed – sent to download client") { api.grab(r) } }) { Text("Grab anyway") } },
+            dismissButton = { TextButton(onClick = { confirm = null }) { Text("Cancel") } },
+        )
     }
 }
 
@@ -1053,4 +1271,150 @@ fun openImdb(ctx: android.content.Context, imdbId: String) {
         try { ctx.startActivity(app); return } catch (e: Exception) { /* app not installed */ }
     }
     try { ctx.startActivity(web) } catch (e: Exception) { }
+}
+
+
+// ------------------------------------------------------------ detail extras
+@Composable
+private fun FactsRow(cfg: ServiceConfig, m: MediaItem) {
+    val r = m.raw
+    val chips = mutableListOf<Pair<String, Color>>()
+    val runtime = r.optInt("runtime")
+    if (runtime > 0) chips += (if (runtime >= 60) "${runtime / 60}h ${runtime % 60}m" else "${runtime}m") to Accent
+    r.optString("certification").takeIf { it.isNotEmpty() }?.let { chips += it to Accent2 }
+    r.optString("studio").takeIf { it.isNotEmpty() }?.let { chips += it to Pink }
+    val ratings = r.optJSONObject("ratings")
+    if (ratings != null) {
+        ratings.optJSONObject("imdb")?.optDouble("value")?.takeIf { it > 0 }?.let { chips += "IMDb %.1f".format(it) to Warn }
+        ratings.optJSONObject("tmdb")?.optDouble("value")?.takeIf { it > 0 }?.let { chips += "TMDB %.1f".format(it) to Good }
+        ratings.optJSONObject("rottenTomatoes")?.optDouble("value")?.takeIf { it > 0 }?.let { chips += "🍅 ${it.toInt()}%" to Bad }
+        ratings.optJSONObject("metacritic")?.optDouble("value")?.takeIf { it > 0 }?.let { chips += "Metacritic ${it.toInt()}" to Accent }
+        if (!ratings.has("imdb") && !ratings.has("tmdb")) ratings.optDouble("value").takeIf { it > 0 }?.let { chips += "★ %.1f".format(it) to Warn }
+    }
+    val tags = r.optJSONArray("tags")
+    if (tags != null && tags.length() > 0) chips += "${tags.length()} tag${if (tags.length() == 1) "" else "s"}" to MaterialTheme.colorScheme.onSurfaceVariant
+    if (chips.isEmpty()) return
+    androidx.compose.foundation.layout.FlowRow(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        chips.forEach { (t, c) -> Pill(t, c) }
+    }
+}
+
+@Composable
+private fun MovieFileCard(m: MediaItem) {
+    val f = m.raw.optJSONObject("movieFile") ?: return
+    val mi = f.optJSONObject("mediaInfo")
+    Panel(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), tint = Good) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Movie, null, tint = Good)
+                Spacer(Modifier.width(8.dp))
+                Text("File on disk", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(humanBytes(f.optLong("size")), style = MaterialTheme.typography.labelMedium, color = Good, fontWeight = FontWeight.Bold)
+            }
+            Text(f.optString("relativePath"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                f.optJSONObject("quality")?.optJSONObject("quality")?.optString("name")?.takeIf { it.isNotEmpty() }?.let { Pill(it, Accent) }
+                if (mi != null) {
+                    mi.optString("resolution").takeIf { it.isNotEmpty() }?.let { Pill(it, Accent2) }
+                    mi.optString("videoCodec").takeIf { it.isNotEmpty() }?.let { Pill(it, Pink) }
+                    mi.optString("videoDynamicRangeType").takeIf { it.isNotEmpty() }?.let { Pill(it, Warn) }
+                    val audio = listOf(mi.optString("audioCodec"), mi.optDouble("audioChannels").takeIf { !it.isNaN() && it > 0 }?.toString() ?: "").filter { it.isNotEmpty() }.joinToString(" ")
+                    if (audio.isNotEmpty()) Pill(audio, Good)
+                    mi.optString("audioLanguages").takeIf { it.isNotEmpty() }?.let { Pill(it.take(30), MaterialTheme.colorScheme.onSurfaceVariant) }
+                    mi.optString("subtitles").takeIf { it.isNotEmpty() }?.let { Pill("Subs: ${it.take(24)}", MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CastRow(api: ArrApi, id: Int) {
+    val l = rememberLoadable(api.cfg, id, "credits") { api.credits(id) }
+    val cast = l.data?.filter { !it.crew }?.take(20).orEmpty()
+    if (cast.isEmpty()) return
+    Column {
+        SectionTitle("Cast")
+        androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(cast) { c ->
+                Column(Modifier.width(84.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.size(72.dp).clip(androidx.compose.foundation.shape.CircleShape).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                        Text(c.name.take(1), fontWeight = FontWeight.Bold)
+                        if (c.image != null) AsyncImage(c.image, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize().clip(androidx.compose.foundation.shape.CircleShape))
+                    }
+                    Text(c.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
+                    Text(c.role, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ItemHistory(api: ArrApi, id: Int) {
+    val l = rememberLoadable(api.cfg, id, "ihist") { api.itemHistory(id) }
+    val d = l.data
+    Column(Modifier.padding(horizontal = 12.dp)) {
+        when {
+            d == null && l.error != null -> Text(l.error ?: "", color = Bad)
+            d == null -> LinearProgressIndicator(Modifier.fillMaxWidth())
+            d.isEmpty() -> Text("No history yet", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> d.take(30).forEach { h ->
+                val c = when { h.event.contains("Import", true) -> Good; h.event.contains("Grab", true) -> Accent; h.event.contains("Fail", true) -> Bad; h.event.contains("Delet", true) -> Warn; else -> Accent2 }
+                Row(Modifier.padding(vertical = 5.dp), verticalAlignment = Alignment.Top) {
+                    StatusDot(c, 10.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Row {
+                            Text(h.event, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = c, modifier = Modifier.weight(1f))
+                            Text(fmtDate(h.date, true), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (h.detail.isNotEmpty()) Text(h.detail, style = MaterialTheme.typography.labelSmall)
+                        Text(h.title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        if (h.quality.isNotEmpty()) Text(h.quality, style = MaterialTheme.typography.labelSmall, color = Accent)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditItemDialog(api: ArrApi, m: MediaItem, done: (Boolean) -> Unit) {
+    val run = rememberRunner()
+    val profiles = rememberLoadable(api.cfg, "editqp") { api.qualityProfiles() }
+    val tagsL = rememberLoadable(api.cfg, "edittags") { api.tags() }
+    var qp by remember { mutableIntStateOf(m.raw.optInt("qualityProfileId")) }
+    var avail by remember { mutableStateOf(m.raw.optString("minimumAvailability")) }
+    var stype by remember { mutableStateOf(m.raw.optString("seriesType")) }
+    var tags by remember { mutableStateOf(m.raw.optJSONArray("tags")?.let { a -> (0 until a.length()).map { a.optInt(it) }.toSet() } ?: emptySet()) }
+    AlertDialog(
+        onDismissRequest = { done(false) }, title = { Text("Edit ${m.title}") },
+        text = {
+            Column(Modifier.heightIn(max = 460.dp).verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                profiles.data?.let { p -> Dropdown("Quality profile", p, p.firstOrNull { it.id == qp }, { it.name }, { qp = it.id }) }
+                if (api.type == ServiceType.RADARR) Dropdown("Minimum availability", listOf("announced", "inCinemas", "released"), avail,
+                    { when (it) { "inCinemas" -> "In cinemas"; "announced" -> "Announced"; else -> "Released" } }, { avail = it })
+                if (api.type == ServiceType.SONARR) Dropdown("Series type", listOf("standard", "daily", "anime"), stype, { it.replaceFirstChar { c -> c.uppercase() } }, { stype = it })
+                val t = tagsL.data
+                if (!t.isNullOrEmpty()) {
+                    Text("Tags", style = MaterialTheme.typography.labelLarge)
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        t.forEach { tg -> androidx.compose.material3.FilterChip(tg.id in tags, { tags = if (tg.id in tags) tags - tg.id else tags + tg.id }, label = { Text(tg.name) }) }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                run("Saved", { done(true) }) {
+                    api.editItem(m.id, qualityProfileId = qp.takeIf { it > 0 },
+                        minimumAvailability = avail.takeIf { api.type == ServiceType.RADARR && it.isNotEmpty() },
+                        seriesType = stype.takeIf { api.type == ServiceType.SONARR && it.isNotEmpty() },
+                        tags = tags.toList())
+                }
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = { done(false) }) { Text("Cancel") } },
+    )
 }

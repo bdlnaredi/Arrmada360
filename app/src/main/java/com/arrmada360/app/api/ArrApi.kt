@@ -91,6 +91,7 @@ data class ReleaseEntry(
     val rejected: Boolean,
     val rejections: List<String>,
     val customScore: Int,
+    val ageHours: Double = 0.0,
 )
 
 data class Profile(val id: Int, val name: String)
@@ -549,6 +550,72 @@ class ArrApi(val cfg: ServiceConfig) {
         }
     }
 
+    // ---------------- bulk editing ----------------
+    private val idsKey get() = when (type) { ServiceType.SONARR -> "seriesIds"; ServiceType.RADARR -> "movieIds"; ServiceType.LIDARR -> "artistIds"; else -> "authorIds" }
+
+    suspend fun bulkEdit(ids: List<Int>, monitored: Boolean? = null, qualityProfileId: Int? = null, addTags: List<Int>? = null, removeTags: List<Int>? = null) {
+        val o = JSONObject().put(idsKey, intsJson(ids))
+        monitored?.let { o.put("monitored", it) }
+        qualityProfileId?.let { o.put("qualityProfileId", it) }
+        if (addTags != null) o.put("tags", intsJson(addTags)).put("applyTags", "add")
+        if (removeTags != null) o.put("tags", intsJson(removeTags)).put("applyTags", "remove")
+        put("$libPath/editor", o.toString())
+    }
+
+    suspend fun bulkDelete(ids: List<Int>, deleteFiles: Boolean) {
+        val body = JSONObject().put(idsKey, intsJson(ids)).put("deleteFiles", deleteFiles).put("addImportExclusion", false).toString()
+        Http.exec(client, rb("$libPath/editor", emptyMap()).delete(body.jsonBody()).build())
+    }
+
+    suspend fun bulkSearch(ids: List<Int>) {
+        if (type == ServiceType.RADARR) command(JSONObject().put("name", "MoviesSearch").put("movieIds", intsJson(ids)))
+        else ids.forEach { searchItem(it) }
+    }
+
+    suspend fun bulkRefresh(ids: List<Int>) {
+        if (type == ServiceType.RADARR) command(JSONObject().put("name", "RefreshMovie").put("movieIds", intsJson(ids)))
+        else ids.forEach { refreshItem(it) }
+    }
+
+    suspend fun tags(): List<Profile> = fetchList("tag").map { Profile(it.int("id"), it.str("label")) }
+    suspend fun createTag(label: String): Profile = JSONObject(post("tag", JSONObject().put("label", label.lowercase()).toString())).let { Profile(it.int("id"), it.str("label")) }
+
+    /** Change settings of one library item. */
+    suspend fun editItem(id: Int, qualityProfileId: Int? = null, minimumAvailability: String? = null, seriesType: String? = null, tags: List<Int>? = null) {
+        val o = JSONObject(get("$libPath/$id"))
+        qualityProfileId?.let { o.put("qualityProfileId", it) }
+        minimumAvailability?.let { o.put("minimumAvailability", it) }
+        seriesType?.let { o.put("seriesType", it) }
+        tags?.let { o.put("tags", intsJson(it)) }
+        put("$libPath/$id", o.toString())
+    }
+
+    data class Credit(val name: String, val role: String, val image: String?, val crew: Boolean)
+    /** Radarr: cast & crew. */
+    suspend fun credits(movieId: Int): List<Credit> = if (type != ServiceType.RADARR) emptyList() else
+        fetchList("credit", mapOf("movieId" to movieId)).map {
+            val crew = it.str("type") == "crew"
+            Credit(it.str("personName"), if (crew) it.str("job") else it.str("character"), if (cfg.artAllowed()) image(it, "headshot") else null, crew)
+        }
+
+    /** History of one movie or series. */
+    suspend fun itemHistory(id: Int): List<HistoryEntry> {
+        val (path, q) = when (type) {
+            ServiceType.RADARR -> "history/movie" to mapOf<String, Any?>("movieId" to id)
+            ServiceType.SONARR -> "history/series" to mapOf<String, Any?>("seriesId" to id, "includeEpisode" to true)
+            ServiceType.LIDARR -> "history/artist" to mapOf<String, Any?>("artistId" to id)
+            else -> "history/author" to mapOf<String, Any?>("authorId" to id)
+        }
+        return fetchList(path, q).map { o ->
+            HistoryEntry(
+                title = o.str("sourceTitle"),
+                event = o.str("eventType").replace(Regex("([a-z])([A-Z])"), "$1 $2").replaceFirstChar { it.uppercase() },
+                date = o.str("date"), quality = o.obj("quality")?.obj("quality")?.str("name") ?: "",
+                detail = o.obj("episode")?.let { e -> "S%02dE%02d · %s".format(e.int("seasonNumber"), e.int("episodeNumber"), e.str("title")) } ?: "",
+            )
+        }.sortedByDescending { it.date }
+    }
+
     // ---------------- releases (interactive search) ----------------
     suspend fun releases(q: Map<String, Any?>): List<ReleaseEntry> = fetchList("release", q).map { o ->
         val age = o.dbl("ageHours")
@@ -563,6 +630,7 @@ class ArrApi(val cfg: ServiceConfig) {
             rejected = o.bool("rejected"),
             rejections = o.arr("rejections").let { a -> (0 until a.length()).map { a.optString(it) } },
             customScore = o.int("customFormatScore"),
+            ageHours = age,
         )
     }.sortedWith(compareBy<ReleaseEntry> { it.rejected }.thenByDescending { it.customScore }.thenByDescending { it.seeders ?: 0 })
 
