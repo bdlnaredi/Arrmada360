@@ -150,8 +150,10 @@ Bottom tabs: **Torrents (or Queue + History) · RSS · Server**
 
 ### <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/tautulli.png" width="28"> Tautulli
 
-- **Activity:** live streams with progress, direct play or transcode, quality, location and bandwidth. You can **stop a stream** and show the viewer a message.
-- **History**, **Stats** (most watched, most active users, platforms, last 30 days) and **Users**.
+- **Activity:** live stream cards with the title's artwork behind them, playback time and time left, Direct Play / Direct Stream / Transcode and LAN / WAN tags, and total bandwidth. Tap a card for player, video, audio, container and IP details. You can **stop a stream** and show the viewer a message.
+- **History:** plays grouped by day, with a filter per user and a watched-percentage ring.
+- **Stats:** plays-per-day chart (7 days, 30 days, 90 days or 1 year), poster rows for the most watched movies and shows, and ranked users and platforms.
+- **Users:** ranked by plays, with watch time and when they were last seen.
 - **Server:** Plex server info and libraries.
 
 ### <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/unraid.png" width="28"> Unraid (7.2+ official API)
@@ -171,6 +173,25 @@ Bottom tabs: **Dashboard · Array · Docker · VMs · Shares**
 - **VMs:** start, stop, pause, resume, reboot and force stop.
 - **Shares:** every share with space used and free, and its cache setting.
 
+### <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/uptime-kuma.png" width="28"> Uptime Kuma
+
+- Every monitor with up / down / pending status, response time and certificate expiry, plus an overall "all systems operational" summary.
+- Needs a Kuma **API key** (*Settings → API Keys*). Add a **status page slug** in the Server tab to also get 24-hour uptime and heartbeat bars.
+- Read-only: pausing or editing monitors isn't available through Kuma's public API.
+
+### <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/whisparr.png" width="28"> Whisparr – optional
+
+Works with Whisparr v2 (Sonarr-based) and v3 (Radarr-based). The app works out which one you run and shows the normal library, queue, add, history and server tabs. Artwork is **hidden by default**. Turn on **Show artwork** in the Server tab.
+
+### <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/stash.png" width="28"> Stasharr / Stash – optional
+
+Bottom tabs: **Overview · Scenes · Tasks · Server**
+
+- **Overview:** scene count, size and duration, plus performers, studios, tags, images, galleries and plays, and running jobs with progress and a stop button.
+- **Scenes:** search and sort (newest, release date, most played, rating, size). Open a scene in Stash, mark it organized, or delete it, with or without the file.
+- **Tasks:** Scan, Identify (uses your default identify sources), Auto tag, Generate, Clean and Optimise database.
+- Artwork is **hidden by default**. Turn on **Show artwork** in the Server tab.
+
 ### Namer (ThePornDB renamer) – optional
 
 Bottom tabs: **Failed · Queue · Server**
@@ -188,6 +209,29 @@ Needs Namer running in watchdog mode with its web UI turned on (default port 698
   - "Timed out – is your phone on Tailscale?"
 - **Search everything:** searches all your libraries at once, and finds new titles to add.
 - **Multiple instances** of the same app (for example Radarr and Radarr 4K).
+- **Radarr and Sonarr detail pages:**
+  - runtime, age rating, studio, and IMDb / TMDB / Rotten Tomatoes ratings
+  - a file card (resolution, codec, HDR, audio, subtitles) and a cast row for movies
+  - per-item history and an **Edit** sheet (quality profile, availability, series type, tags)
+- **Interactive search everywhere:** movies, whole seasons, single episodes, and the Missing and Calendar lists. Sort by best, seeders, size or newest, and filter by torrent or usenet, quality or text.
+- **Bulk library actions:** long-press posters to select several, then monitor, unmonitor, search, refresh, change quality profile, add or remove tags, or delete.
+- **Year in review:** movies and episodes downloaded per month, data grabbed, top genres, disk use and Plex stats (*Dashboard → Server*).
+- **Home-screen widgets:**
+  - **Downloads:** live speed and top torrents, with pause/resume and refresh buttons
+  - **Coming up:** your next 5 episodes and movies
+  - **Shortcuts:** Movies, TV, Search and Downloads
+- **Quick Settings tile:** pause or resume every download client from the notification shade.
+- **Richer notifications:**
+  - poster and backdrop images
+  - **Approve / Decline** buttons on new Seerr requests
+  - **Open** buttons on finished downloads
+- **App lock:** fingerprint, face or screen lock, with a choice of how soon it locks again (*Settings → General → Security*).
+- **Themes:** dark, light or follow your phone, AMOLED black, and Material You colours from your wallpaper (Android 12+).
+- **Tablets, foldables and Android TV:**
+  - the side menu stays open on wide screens
+  - the library and details sit side by side
+  - posters and cards light up as you move around with a TV remote
+- **Offline cache:** your libraries, calendars and stats still show, with an "Offline" banner, when a server can't be reached.
 - **Self-signed HTTPS** support for each app.
 
 ---
@@ -232,6 +276,9 @@ You can add, edit, reorder or remove apps later in **Settings → Your apps**. L
 | NZBGet | 6789 | *Settings → Security → ControlUsername / ControlPassword* |
 | Overseerr / Jellyseerr | 5055 | *Settings → General → API Key* |
 | Tautulli | 8181 | *Settings → Web Interface → API Key* |
+| Whisparr | 6969 | *Settings → General → API Key* |
+| Uptime Kuma | 3001 | *Settings → API Keys → Add API key*. Optional status page slug in the Server tab |
+| Stasharr / Stash | 2704 / 9999 | *Settings → Security → API Key* (leave blank if Stash has no login) |
 | Namer | 6980 | No key. Turn on the web UI in `namer.cfg` and include `web_root` in the address if you set one |
 | Unraid 7.2+ | 80 / 443 | *Settings → Management Access → API Keys*. Create a key with the **Admin** role |
 

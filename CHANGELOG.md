@@ -4,11 +4,41 @@ All notable changes to Arrmada360 are listed here, newest first.
 Every successful build on `main` is published as **`Arrmada360.apk`** in the [latest release](../../releases/latest).
 The app version is `1.0.<build number>`. The build number is shown in *Settings* and in the release title.
 
-Builds #2, #5, #10, #15, #18 and #19 failed to compile in CI and were fixed straight away in builds #3, #6, #11, #16 and #20, so there is no APK for them.
+Builds #2, #5, #10, #15, #18, #19, #29 and #33 failed to compile in CI and were fixed straight away in builds #3, #6, #11, #16, #20, #30 and #34, so there is no APK for them.
 
 ---
 
-## [Unreleased] – next build
+## [1.0.34] – build #34
+
+### Added
+- **New apps:** Whisparr (v2 and v3), Uptime Kuma and Stasharr / Stash. Whisparr and Stash artwork is hidden until you turn on **Show artwork** in the Server tab.
+- **Radarr and Sonarr detail pages:** ratings, runtime, age rating and studio; a movie file card and cast row; per-item history; an **Edit** sheet for quality profile, availability, series type and tags.
+- **Interactive search everywhere:**
+  - whole Sonarr seasons, episodes, movies, and the Missing and Calendar lists
+  - sort and filter results by protocol, quality or text
+  - asks before grabbing a rejected release
+- **Bulk library actions:** long-press to select, then monitor, unmonitor, search, refresh, change quality, add or remove tags, or delete.
+- **Home-screen widgets:** Downloads, Coming up and Shortcuts.
+- **Quick Settings tile** to pause or resume every download client.
+- **Richer notifications:** poster and backdrop images, **Approve / Decline** for Seerr requests, and **Open** buttons.
+- **App lock** with fingerprint, face or screen lock, and a choice of how soon it locks again.
+- **Year in review** (*Dashboard → Server*).
+- **Light theme**, **follow-phone theme** and **Material You** colours.
+- **Tablet and Android TV layout:**
+  - the side menu always shows on wide screens
+  - a two-pane library and detail view
+  - focus highlights for TV remotes
+  - an Android TV launcher banner
+- **Offline cache:** last-known data with an "Offline" banner when a server is unreachable. You can turn it off in *Settings → General*.
+
+### Changed
+- **Tautulli redesigned:**
+  - artwork-backed stream cards with expandable details
+  - history grouped by day with a user filter
+  - stats with a plays chart, poster rows and rankings
+  - ranked users
+
+## [1.0.28] – build #28
 
 ### Changed
 - **New Settings home**, laid out like nzb360's but in Arrmada360's style:
