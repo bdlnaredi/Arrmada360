@@ -73,6 +73,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import com.arrmada360.app.ui.humanBytes
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.unit.sp
@@ -740,6 +744,27 @@ fun NotificationsScreen(nav: Navigator, back: () -> Unit) {
                         Text("Turn the background media-notifier on.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(enabled, { setEnabled(it) }, colors = SwitchDefaults.colors(checkedTrackColor = Good, checkedThumbColor = Color(0xFF111318), uncheckedTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)))
+                }
+            }
+        }
+        item {
+            var on by remember { mutableStateOf(com.arrmada360.app.notify.DailySummary.enabled) }
+            var at by remember { mutableIntStateOf(com.arrmada360.app.notify.DailySummary.atMin) }
+            val scope = rememberCoroutineScope()
+            SettingsGroup("Daily summary") {
+                SettingSwitch("Morning summary", "One notification a day with what downloaded overnight, what's airing today and anything that needs attention.", on) {
+                    if (it && Build.VERSION.SDK_INT >= 33 && !Notifier.canPost(ctx)) { permission.launch(Manifest.permission.POST_NOTIFICATIONS) }
+                    on = it; com.arrmada360.app.notify.DailySummary.enabled = it; com.arrmada360.app.notify.DailySummary.schedule(ctx.applicationContext)
+                }
+                SettingLink(Icons.Filled.Schedule, "Send at", value = "%02d:%02d".format(at / 60, at % 60)) {
+                    android.app.TimePickerDialog(ctx, { _, h, m -> at = h * 60 + m; com.arrmada360.app.notify.DailySummary.atMin = at; com.arrmada360.app.notify.DailySummary.schedule(ctx.applicationContext) }, at / 60, at % 60, true).show()
+                }
+                SettingLink(Icons.Filled.Visibility, "Send a preview now", divider = false) {
+                    ctx.toast("Building your summary…")
+                    scope.launch {
+                        val (t, b) = try { com.arrmada360.app.notify.DailySummary.build() } catch (e: Exception) { "Summary failed" to (e.message ?: "") }
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { Notifier.post(ctx.applicationContext, 777100, t, b, null) }
+                    }
                 }
             }
         }

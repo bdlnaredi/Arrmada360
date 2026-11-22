@@ -36,6 +36,8 @@ class MainActivity : ComponentActivity() {
                 .build()
         )
         Notifier.schedule(applicationContext)
+        com.arrmada360.app.notify.AutomationWorker.schedule(applicationContext)
+        com.arrmada360.app.notify.DailySummary.schedule(applicationContext)
         lock = AppLock.Prompter(this)
         handle(intent)
         setContent {

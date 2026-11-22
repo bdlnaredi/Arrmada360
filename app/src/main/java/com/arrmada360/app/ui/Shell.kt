@@ -80,6 +80,8 @@ sealed interface Route {
     data class Service(val id: String) : Route
     data class ArrDetail(val serviceId: String, val itemId: Int) : Route
     data object YearReview : Route
+    data class UnraidLive(val serviceId: String) : Route
+    data class UnraidLogs(val serviceId: String, val containerId: String?, val containerName: String?) : Route
     data object SpeedScheduler : Route
     data object SeedingManager : Route
     data class ArrCollections(val serviceId: String, val focusTmdb: Int?) : Route
@@ -164,6 +166,7 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
                     val iid = seg.getOrNull(1)?.toIntOrNull()
                     if (svc != null && iid != null) { nav.root(Route.Service(svc.id)); nav.push(Route.ArrDetail(svc.id, iid)) }
                 }
+                "dashboard" -> nav.root(Route.Dashboard)
                 "movies" -> { DashboardNav.tab = 0; nav.root(Route.Dashboard) }
                 "tv" -> { DashboardNav.tab = 1; nav.root(Route.Dashboard) }
                 "calendar" -> { DashboardNav.tab = 2; nav.root(Route.Dashboard) }
@@ -253,6 +256,12 @@ private fun RouteContent(r: Route, nav: Navigator) {
         }
         is Route.ArrCollections -> ConfigStore.get(r.serviceId)?.let { cfg ->
             ServiceTheme(cfg.type, ConfigStore.amoled) { com.arrmada360.app.ui.screens.CollectionsScreen(cfg, r.focusTmdb, nav, back) }
+        } ?: EmptyBox("Service missing")
+        is Route.UnraidLive -> ConfigStore.get(r.serviceId)?.let { cfg ->
+            ServiceTheme(cfg.type, ConfigStore.amoled) { com.arrmada360.app.ui.screens.UnraidLiveScreen(cfg, back) }
+        } ?: EmptyBox("Service missing")
+        is Route.UnraidLogs -> ConfigStore.get(r.serviceId)?.let { cfg ->
+            ServiceTheme(cfg.type, ConfigStore.amoled) { com.arrmada360.app.ui.screens.UnraidLogsScreen(cfg, r.containerId, r.containerName, back) }
         } ?: EmptyBox("Service missing")
         is Route.ArrQuality -> ConfigStore.get(r.serviceId)?.let { cfg ->
             ServiceTheme(cfg.type, ConfigStore.amoled) { com.arrmada360.app.ui.screens.QualityFinderScreen(cfg, nav, back) }

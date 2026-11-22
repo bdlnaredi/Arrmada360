@@ -1,5 +1,8 @@
 package com.arrmada360.app.ui.screens
 
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.Description
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -126,9 +129,9 @@ fun UnraidScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () -
     ) { pad ->
         Box(Modifier.padding(pad)) {
             when (tab) {
-                0 -> UnraidDashboard(api) { tab = it }
+                0 -> UnraidDashboard(api, nav) { tab = it }
                 1 -> UnraidArrayTab(api)
-                2 -> UnraidDockerTab(api)
+                2 -> UnraidDockerTab(api, nav)
                 3 -> UnraidVmTab(api)
                 else -> UnraidSharesTab(api)
             }
@@ -143,7 +146,7 @@ private class UnraidDash(
 )
 
 @Composable
-private fun UnraidDashboard(api: UnraidApi, goTab: (Int) -> Unit) {
+private fun UnraidDashboard(api: UnraidApi, nav: Navigator, goTab: (Int) -> Unit) {
     var confirm by remember { mutableStateOf<Confirm?>(null) }
     val run = rememberRunner()
     val l = rememberLoadable(api.cfg, "udash", autoRefreshMs = 8000) {
@@ -156,6 +159,22 @@ private fun UnraidDashboard(api: UnraidApi, goTab: (Int) -> Unit) {
     }
     LoadableContent(l) { d ->
         LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Panel(Modifier.weight(1f), tint = Accent, onClick = { nav.push(Route.UnraidLive(api.cfg.id)) }) {
+                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.ShowChart, null, tint = Accent); Spacer(Modifier.width(8.dp))
+                            Text("Live graphs", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                    Panel(Modifier.weight(1f), tint = Warn, onClick = { nav.push(Route.UnraidLogs(api.cfg.id, null, null)) }) {
+                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Description, null, tint = Warn); Spacer(Modifier.width(8.dp))
+                            Text("Logs", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+            }
             d.sys?.let { s ->
                 item {
                     Panel(Modifier.fillMaxWidth()) {
@@ -369,7 +388,7 @@ private fun DiskRow(d: UnraidDisk) {
 
 // ------------------------------------------------------------ Docker
 @Composable
-private fun UnraidDockerTab(api: UnraidApi) {
+private fun UnraidDockerTab(api: UnraidApi, nav: Navigator) {
     val l = rememberLoadable(api.cfg, "udocker", autoRefreshMs = 8000) { api.containers() }
     val run = rememberRunner()
     var filter by rememberSaveable { mutableIntStateOf(0) }
@@ -416,6 +435,7 @@ private fun UnraidDockerTab(api: UnraidApi) {
                             Box {
                                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, null) }
                                 DropdownMenu(menu, { menu = false }) {
+                                    DropdownMenuItem(text = { Text("Logs") }, leadingIcon = { Icon(Icons.Filled.Description, null) }, onClick = { menu = false; nav.push(Route.UnraidLogs(api.cfg.id, c.id, c.name)) })
                                     DropdownMenuItem(text = { Text("Pause") }, leadingIcon = { Icon(Icons.Filled.Pause, null) }, onClick = { menu = false; run("Paused ${c.name}", { l.load(true) }) { api.gql("mutation { docker { pause(id: \"${c.id}\") { id state } } }") } })
                                     DropdownMenuItem(text = { Text("Unpause") }, leadingIcon = { Icon(Icons.Filled.PlayArrow, null) }, onClick = { menu = false; run("Unpaused ${c.name}", { l.load(true) }) { api.gql("mutation { docker { unpause(id: \"${c.id}\") { id state } } }") } })
                                 }

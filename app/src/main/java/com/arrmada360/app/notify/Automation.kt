@@ -108,7 +108,7 @@ class AutomationWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
     companion object {
         private const val NAME = "arrmada360-automation"
         fun schedule(ctx: Context) {
-            val need = SpeedSchedule.enabled || SeedRules.autoClean
+            val need = SpeedSchedule.enabled || SeedRules.autoClean || ConfigStore.services.any { it.type == ServiceType.UNRAID }
             val wm = WorkManager.getInstance(ctx)
             if (!need) { wm.cancelUniqueWork(NAME); return }
             wm.enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.KEEP, PeriodicWorkRequestBuilder<AutomationWorker>(15, TimeUnit.MINUTES).build())
@@ -120,6 +120,9 @@ class AutomationWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
         com.arrmada360.app.net.NetSwitch.start(applicationContext)
         if (SpeedSchedule.enabled) try { SpeedSchedule.applyNow() } catch (e: Exception) { }
         if (SeedRules.autoClean) try { clean() } catch (e: Exception) { }
+        ConfigStore.services.filter { it.type == ServiceType.UNRAID }.forEach { c ->
+            try { com.arrmada360.app.api.UnraidHistory.add(c, com.arrmada360.app.api.UnraidApi(c).liveMetrics()) } catch (e: Exception) { }
+        }
         return Result.success()
     }
 
@@ -137,5 +140,90 @@ class AutomationWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker
         }.awaitAll().flatten()
         if (removed.isNotEmpty()) Notifier.post(applicationContext, 777001, "Seeding manager removed ${removed.size} torrent${if (removed.size == 1) "" else "s"}",
             removed.take(6).joinToString("\n") + if (removed.size > 6) "\n…" else "", null)
+    }
+}
+
+/** One notification every morning: what downloaded, what's on today and anything broken. */
+object DailySummary {
+    private const val NAME = "arrmada360-daily-summary"
+    var enabled: Boolean
+        get() = ConfigStore.flag("dailySummary")
+        set(v) = ConfigStore.setFlag("dailySummary", v)
+    var atMin: Int
+        get() = ConfigStore.getInt("dailySummaryAt", 9 * 60)
+        set(v) = ConfigStore.putInt("dailySummaryAt", v)
+
+    fun schedule(ctx: Context) {
+        val wm = WorkManager.getInstance(ctx)
+        if (!enabled) { wm.cancelUniqueWork(NAME); return }
+        val now = java.time.LocalDateTime.now()
+        var next = now.toLocalDate().atTime(atMin / 60, atMin % 60)
+        if (!next.isAfter(now)) next = next.plusDays(1)
+        val delay = java.time.Duration.between(now, next).toMinutes()
+        wm.enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.UPDATE,
+            PeriodicWorkRequestBuilder<DailySummaryWorker>(24, TimeUnit.HOURS).setInitialDelay(delay, TimeUnit.MINUTES).build())
+    }
+
+    suspend fun build(): Pair<String, String> = coroutineScope {
+        val arrs = ConfigStore.services.filter { (it.type == ServiceType.SONARR || it.type == ServiceType.RADARR) }
+        val since = java.time.Instant.now().minusSeconds(24 * 3600)
+        val imports = arrs.map { c ->
+            async {
+                try {
+                    com.arrmada360.app.api.ArrApi(c).history().filter { h ->
+                        h.event.contains("import", true) && try { java.time.OffsetDateTime.parse(h.date).toInstant().isAfter(since) } catch (e: Exception) { false }
+                    }.map { listOf(it.parentTitle, it.detail).filter { s -> s.isNotEmpty() }.joinToString(" – ").ifEmpty { it.title } }
+                } catch (e: Exception) { emptyList() }
+            }
+        }
+        val today = java.time.LocalDate.now()
+        val airing = arrs.map { c ->
+            async {
+                try {
+                    com.arrmada360.app.api.ArrApi(c).calendar(0, 1).filter { e ->
+                        val d = try { if (e.date.length > 10) java.time.OffsetDateTime.parse(e.date).atZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalDate() else java.time.LocalDate.parse(e.date.take(10)) } catch (x: Exception) { null }
+                        d == today
+                    }.map { "${it.title} ${it.subtitle}".trim() }
+                } catch (e: Exception) { emptyList() }
+            }
+        }
+        val health = (arrs + ConfigStore.services.filter { it.type == ServiceType.PROWLARR || it.type == ServiceType.LIDARR || it.type == ServiceType.READARR }).map { c ->
+            async { try { com.arrmada360.app.api.ArrApi(c).healthIssues().filter { it.type.equals("error", true) || it.type.equals("warning", true) }.size.let { if (it > 0) "${c.name}: $it health warning${if (it == 1) "" else "s"}" else null } } catch (e: Exception) { "${c.name} is offline" } }
+        }
+        val kuma = ConfigStore.services.filter { it.type == ServiceType.UPTIME_KUMA }.map { c ->
+            async { try { com.arrmada360.app.api.KumaApi(c).monitors().filter { it.status == 0 }.map { "${it.name} is down" } } catch (e: Exception) { emptyList() } }
+        }
+        val disks = arrs.map { c -> async { try { com.arrmada360.app.api.ArrApi(c).diskSpace() } catch (e: Exception) { emptyList() } } }
+        val got = imports.awaitAll().flatten().distinct()
+        val on = airing.awaitAll().flatten().distinct()
+        val problems = (health.awaitAll().filterNotNull() + kuma.awaitAll().flatten()).toMutableList()
+        disks.awaitAll().flatten().distinctBy { it.path }.filter { it.total > 0 && it.free.toDouble() / it.total < 0.1 }.forEach {
+            problems += "${it.path} only ${com.arrmada360.app.ui.humanBytes(it.free)} free"
+        }
+        val title = buildString {
+            append("Good morning · ")
+            append(if (got.isEmpty()) "nothing new" else "${got.size} new download${if (got.size == 1) "" else "s"}")
+            if (on.isNotEmpty()) append(" · ${on.size} airing today")
+            if (problems.isNotEmpty()) append(" · ${problems.size} issue${if (problems.size == 1) "" else "s"}")
+        }
+        val body = buildString {
+            if (got.isNotEmpty()) { append("Downloaded:\n"); got.take(8).forEach { append("• ").append(it).append('\n') }; if (got.size > 8) append("…and ${got.size - 8} more\n") }
+            if (on.isNotEmpty()) { append("Today:\n"); on.take(6).forEach { append("• ").append(it).append('\n') } }
+            if (problems.isNotEmpty()) { append("Needs attention:\n"); problems.take(6).forEach { append("⚠ ").append(it).append('\n') } }
+            if (isEmpty()) append("All quiet on your server.")
+        }.trim()
+        title to body
+    }
+}
+
+class DailySummaryWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
+    override suspend fun doWork(): Result {
+        ConfigStore.init(applicationContext)
+        if (!DailySummary.enabled) return Result.success()
+        com.arrmada360.app.net.NetSwitch.start(applicationContext)
+        val (t, b) = try { DailySummary.build() } catch (e: Exception) { return Result.retry() }
+        Notifier.post(applicationContext, 777100, t, b, null, link = "arrmada360://dashboard",
+            actions = listOf(Notifier.Action("Calendar", Notifier.linkIntent(applicationContext, 777101, "arrmada360://calendar"))))
+        return Result.success()
     }
 }
