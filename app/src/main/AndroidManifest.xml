@@ -56,6 +56,25 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <!-- Share a video clip or screenshot to find out which movie / show it is -->
+            <intent-filter android:label="What is this? (Arrmada360)">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="video/*" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <!-- Open IMDb and TMDB links in the app -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="www.imdb.com" />
+                <data android:host="m.imdb.com" />
+                <data android:host="imdb.com" />
+                <data android:host="www.themoviedb.org" />
+                <data android:host="themoviedb.org" />
+            </intent-filter>
         </activity>
         <receiver android:name=".widget.DownloadsWidget" android:exported="true" android:label="Arrmada360 downloads">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>

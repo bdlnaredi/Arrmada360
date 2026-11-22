@@ -1,6 +1,8 @@
 package com.arrmada360.app.ui.screens
 
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.ImageSearch
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -156,12 +158,11 @@ fun DashboardScreen(nav: Navigator) {
             BottomTab("Movies", Icons.Filled.Movie),
             BottomTab("TV Shows", Icons.Filled.Tv),
             BottomTab("Calendar", Icons.Filled.CalendarMonth),
-            BottomTab("Server", Icons.Filled.Dns),
-        ),
+        ) + if (com.arrmada360.app.data.Family.active && !com.arrmada360.app.data.Family.showServerTab) emptyList() else listOf(BottomTab("Server", Icons.Filled.Dns)),
         selectedBottom = tab, onBottom = { tab = it; pick = 0 },
         fab = {
             val target = if (searching) null else instances.getOrNull(pick)
-            if (target != null) androidx.compose.material3.FloatingActionButton(
+            if (target != null && !com.arrmada360.app.data.Family.active) androidx.compose.material3.FloatingActionButton(
                 onClick = { nav.push(Route.ArrAdd(target.id)) }, containerColor = target.type.tint, shape = androidx.compose.foundation.shape.CircleShape,
             ) { Icon(Icons.Filled.Add, "Add") }
         },
@@ -786,6 +787,16 @@ private fun SeerrCard(nav: Navigator) {
 @Composable
 private fun DashboardSearchBar(value: String, onChange: (String) -> Unit) {
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val voice = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { r ->
+        val said = r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull() ?: return@rememberLauncherForActivityResult
+        // "add dune part two" / "search for dune" → "dune part two"
+        onChange(said.replace(Regex("^(please )?(add|search( for)?|find|download|get)\\s+", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\s+(to|in|on) (radarr|sonarr|my library)$", RegexOption.IGNORE_CASE), "").trim())
+    }
+    val pickClip = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { u ->
+        if (u != null) com.arrmada360.app.data.ShareInbox.clip = u.toString() to ctx.contentResolver.getType(u)
+    }
     Row(
         Modifier.padding(end = 12.dp).fillMaxWidth().height(48.dp).clip(RoundedCornerShape(50))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)).padding(horizontal = 14.dp),
@@ -797,7 +808,7 @@ private fun DashboardSearchBar(value: String, onChange: (String) -> Unit) {
             if (value.isEmpty()) Text("Search movies, TV…", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
             androidx.compose.foundation.text.BasicTextField(
                 value, onChange, singleLine = true,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { focus.clearFocus() }),
@@ -806,6 +817,18 @@ private fun DashboardSearchBar(value: String, onChange: (String) -> Unit) {
         }
         if (value.isNotEmpty()) IconButton(onClick = { onChange(""); focus.clearFocus() }, modifier = Modifier.size(32.dp)) {
             Icon(androidx.compose.material.icons.Icons.Filled.Close, "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            IconButton(onClick = { pickClip.launch("video/*") }, modifier = Modifier.size(34.dp)) {
+                Icon(androidx.compose.material.icons.Icons.Filled.ImageSearch, "Identify a clip", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            IconButton(onClick = {
+                val i = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                    .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Say a movie or show, e.g. \"add Dune Part Two\"")
+                try { voice.launch(i) } catch (e: Exception) { android.widget.Toast.makeText(ctx, "Voice search isn't available on this device", android.widget.Toast.LENGTH_SHORT).show() }
+            }, modifier = Modifier.size(34.dp)) {
+                Icon(androidx.compose.material.icons.Icons.Filled.Mic, "Voice search", tint = MaterialTheme.colorScheme.primary)
+            }
         }
     }
 }

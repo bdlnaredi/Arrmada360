@@ -69,6 +69,16 @@ class MainActivity : ComponentActivity() {
             AppEvents.deepLink.tryEmit(data)
             return
         }
+        if (i.action == Intent.ACTION_SEND && (i.type?.startsWith("video") == true || i.type?.startsWith("image") == true)) {
+            @Suppress("DEPRECATION")
+            val u = (if (android.os.Build.VERSION.SDK_INT >= 33) i.getParcelableExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java) else i.getParcelableExtra(Intent.EXTRA_STREAM)) as? android.net.Uri
+            if (u != null) { com.arrmada360.app.data.ShareInbox.clip = u.toString() to i.type; return }
+        }
+        val text = if (i.action == Intent.ACTION_SEND) i.getStringExtra(Intent.EXTRA_TEXT) else i.dataString
+        if (text != null && com.arrmada360.app.api.ClipFinder.isTitleLink(text)) {
+            com.arrmada360.app.data.ShareInbox.titleLink = Regex("https?://\\S+").find(text)?.value ?: text
+            return
+        }
         val link = when (i.action) {
             Intent.ACTION_VIEW -> i.dataString
             Intent.ACTION_SEND -> i.getStringExtra(Intent.EXTRA_TEXT)

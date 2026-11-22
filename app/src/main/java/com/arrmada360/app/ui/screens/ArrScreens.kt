@@ -468,7 +468,7 @@ fun LibraryTab(api: ArrApi, nav: Navigator, onOpen: ((Int) -> Unit)? = null) {
                 modifier = Modifier.fillMaxSize(),
             ) {
                 items(shown, key = { it.id }) { m ->
-                    PosterTile(m, selected = m.id in selected, onLong = { selected = if (m.id in selected) selected - m.id else selected + m.id }) {
+                    PosterTile(m, selected = m.id in selected, onLong = if (com.arrmada360.app.data.Family.active) null else ({ selected = if (m.id in selected) selected - m.id else selected + m.id })) {
                         if (selected.isNotEmpty()) selected = if (m.id in selected) selected - m.id else selected + m.id
                         else { if (ConfigStore.flag(com.arrmada360.app.data.Pref.AUTO_CLEAR_SEARCH)) query = ""; if (onOpen != null) onOpen(m.id) else nav.push(Route.ArrDetail(api.cfg.id, m.id)) }
                     }
@@ -777,7 +777,7 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
         title = item.data?.title ?: "Loading…", isRoot = false, onBack = back,
         actions = {
             IconButton(onClick = { run("Refreshing") { api.refreshItem(itemId) } }) { Icon(Icons.Filled.Refresh, "Refresh") }
-            IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.Delete, "Delete") }
+            if (!com.arrmada360.app.data.Family.active) IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Filled.Delete, "Delete") }
         },
     ) { pad ->
         val m = item.data
@@ -805,7 +805,7 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                         }
                     }
                 }
-                item {
+                if (!com.arrmada360.app.data.Family.active) item {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                         ActionButton(if (m.monitored) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder, if (m.monitored) "Monitored" else "Unmonitored") {
                             run(if (m.monitored) "Unmonitored" else "Monitored", { item.load(true) }) { api.setMonitored(itemId, !m.monitored) }

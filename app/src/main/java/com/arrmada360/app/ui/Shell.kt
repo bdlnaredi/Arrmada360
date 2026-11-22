@@ -15,7 +15,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.FamilyRestroom
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Wifi
@@ -80,6 +84,9 @@ sealed interface Route {
     data class Service(val id: String) : Route
     data class ArrDetail(val serviceId: String, val itemId: Int) : Route
     data object YearReview : Route
+    data class ClipFinder(val uri: String, val mime: String?) : Route
+    data class LinkLookup(val link: String) : Route
+    data object SettingsFamily : Route
     data class UnraidLive(val serviceId: String) : Route
     data class UnraidLogs(val serviceId: String, val containerId: String?, val containerName: String?) : Route
     data object SpeedScheduler : Route
@@ -129,6 +136,10 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
     }
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val sharedClip = com.arrmada360.app.data.ShareInbox.clip
+    LaunchedEffect(sharedClip) { sharedClip?.let { (u, m) -> nav.push(Route.ClipFinder(u, m)); com.arrmada360.app.data.ShareInbox.clip = null } }
+    val sharedLink = com.arrmada360.app.data.ShareInbox.titleLink
+    LaunchedEffect(sharedLink) { sharedLink?.let { nav.push(Route.LinkLookup(it)); com.arrmada360.app.data.ShareInbox.titleLink = null } }
 
     BackHandler(enabled = drawer.isOpen || nav.stack.size > 1 || (nav.current != Route.Dashboard && ConfigStore.flag(com.arrmada360.app.data.Pref.BACK_TO_DASHBOARD))) {
         when {
@@ -216,12 +227,25 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
     }
 }
 
+/** What family members are allowed to open. */
+private fun familyAllows(r: Route): Boolean = when (r) {
+    Route.Dashboard, Route.YearReview, Route.Changelog -> true
+    is Route.ClipFinder, is Route.LinkLookup, is Route.ArrDetail -> true
+    is Route.Service -> com.arrmada360.app.data.Family.canOpen(r.id)
+    is Route.Search -> true
+    else -> false
+}
+
 @Composable
 private fun RouteContent(r: Route, nav: Navigator) {
     val back: () -> Unit = { if (!nav.pop()) nav.root(Route.Dashboard) }
     val isRoot = nav.stack.size == 1
+    if (com.arrmada360.app.data.Family.active && !familyAllows(r)) { com.arrmada360.app.ui.screens.FamilyBlockedScreen(nav, back); return }
     when (r) {
         Route.Dashboard -> DashboardScreen(nav)
+        is Route.ClipFinder -> com.arrmada360.app.ui.screens.ClipFinderScreen(r.uri, r.mime, nav, back)
+        is Route.LinkLookup -> com.arrmada360.app.ui.screens.LinkLookupScreen(r.link, nav, back)
+        Route.SettingsFamily -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.FamilySettingsScreen(back) }
         Route.Settings -> com.arrmada360.app.ui.screens.SettingsGate(back) { SettingsScreen(nav, isRoot, back) }
         Route.SettingsGeneral -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.GeneralSettingsScreen(nav, back) }
         Route.SettingsGestures -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.GestureSettingsScreen(back) }
@@ -311,7 +335,7 @@ private fun DrawerContent(current: Route, go: (Route) -> Unit, push: (Route) -> 
                         append("Arrmada")
                         pushStyle(androidx.compose.ui.text.SpanStyle(color = Accent)); append("360"); pop()
                     },
-                    style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold,
                 )
             }
             Row(Modifier.padding(start = 24.dp, end = 16.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -319,7 +343,7 @@ private fun DrawerContent(current: Route, go: (Route) -> Unit, push: (Route) -> 
                 Spacer(Modifier.width(12.dp))
                 Box(
                     Modifier.size(38.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).background(Accent.copy(alpha = 0.16f))
-                        .clickable { push(Route.Settings) },
+                        .clickable { if (!com.arrmada360.app.data.Family.active) push(Route.Settings) },
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Filled.Edit, "Edit apps", tint = Accent, modifier = Modifier.size(18.dp)) }
             }
@@ -328,7 +352,7 @@ private fun DrawerContent(current: Route, go: (Route) -> Unit, push: (Route) -> 
                 DrawerRow("Dashboard", current == Route.Dashboard, Accent, onClick = { go(Route.Dashboard) }) {
                     Icon(Icons.Filled.Dashboard, null, tint = if (current == Route.Dashboard) Accent else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(26.dp))
                 }
-                ConfigStore.services.forEach { s ->
+                ConfigStore.services.filter { com.arrmada360.app.data.Family.canOpen(it.id) }.forEach { s ->
                     val sel = (current as? Route.Service)?.id == s.id
                     val failing = Connections.of(s.id) is Conn.Fail
                     DrawerRow(s.display(), sel, s.type.tint, warn = failing, onClick = { go(Route.Service(s.id)) }) { ServiceLogo(s.type, 30.dp, s.name) }
@@ -336,13 +360,23 @@ private fun DrawerContent(current: Route, go: (Route) -> Unit, push: (Route) -> 
                 Spacer(Modifier.height(12.dp))
             }
             // ---- footer: settings + connection pill
+            var familyExit by remember { mutableStateOf(false) }
+            if (familyExit) com.arrmada360.app.ui.screens.FamilyExitDialog { familyExit = false }
+            if (com.arrmada360.app.data.Family.active) Row(
+                Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                    .background(Accent2.copy(alpha = 0.18f)).clickable { familyExit = true }.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.FamilyRestroom, null, tint = Accent2); Spacer(Modifier.width(10.dp))
+                Text("Family mode · tap to leave", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            }
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier.size(56.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
                         .background(if (current == Route.Settings) Accent.copy(alpha = 0.2f) else MaterialTheme.colorScheme.background)
-                        .clickable { go(Route.Settings) },
+                        .clickable { if (com.arrmada360.app.data.Family.active) familyExit = true else go(Route.Settings) },
                     contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Filled.Settings, "Settings", tint = MaterialTheme.colorScheme.onSurface) }
+                ) { Icon(if (com.arrmada360.app.data.Family.active) Icons.Filled.Lock else Icons.Filled.Settings, "Settings", tint = MaterialTheme.colorScheme.onSurface) }
                 Spacer(Modifier.width(10.dp))
                 val remoteApps = ConfigStore.services.filter { it.hasRemote }
                 val local = remoteApps.isEmpty() || remoteApps.all { com.arrmada360.app.net.NetSwitch.useLocal(it) }

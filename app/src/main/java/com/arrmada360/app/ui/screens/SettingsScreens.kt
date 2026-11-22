@@ -73,6 +73,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import com.arrmada360.app.ui.humanBytes
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.FamilyRestroom
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.runtime.rememberCoroutineScope
@@ -523,6 +524,7 @@ fun GeneralSettingsScreen(nav: Navigator, back: () -> Unit) {
             var timeoutDlg by remember { mutableStateOf(false) }
             val opts = listOf(0 to "Immediately", 30 to "After 30 seconds", 60 to "After 1 minute", 300 to "After 5 minutes", 900 to "After 15 minutes")
             SettingsGroup("Security") {
+                SettingLink(Icons.Filled.FamilyRestroom, "Family mode", if (com.arrmada360.app.data.Family.hasPin) "Read-only profile with the apps you choose" else "Set up a read-only profile for family") { nav.push(Route.SettingsFamily) }
                 SettingSwitch("App lock", "Unlock Arrmada360 with your fingerprint, face or screen lock every time you open it.", lockOn) {
                     if (it && !com.arrmada360.app.AppLock.deviceSecure(ctx)) ctx.toast("Set a screen lock (PIN, pattern or fingerprint) on your phone first")
                     else { lockOn = it; ConfigStore.setFlag(com.arrmada360.app.AppLock.PREF, it) }
@@ -864,6 +866,8 @@ fun DiscoverySettingsScreen(back: () -> Unit) {
     val ctx = LocalContext.current
     var tmdb by remember { mutableStateOf(ConfigStore.tmdbKey) }
     var trakt by remember { mutableStateOf(ConfigStore.traktClientId) }
+    var gemini by remember { mutableStateOf(com.arrmada360.app.api.ClipFinder.geminiKey) }
+    var region by remember { mutableStateOf(ConfigStore.getString("watchRegion")) }
     SettingsPage("Discovery sources", back) {
         item {
             Text(
@@ -878,8 +882,14 @@ fun DiscoverySettingsScreen(back: () -> Unit) {
                         supportingText = { Text("themoviedb.org → Settings → API (free)") })
                     OutlinedTextField(trakt, { trakt = it }, label = { Text("Trakt Client ID") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         supportingText = { Text("trakt.tv/oauth/applications → New application → Client ID (free)") })
+                    OutlinedTextField(gemini, { gemini = it }, label = { Text("Gemini API key (clip finder)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        supportingText = { Text("aistudio.google.com → Get API key (free). Used to recognise shared clips.") })
+                    OutlinedTextField(region, { region = it.uppercase().take(2) }, label = { Text("Where-to-stream country") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                        supportingText = { Text("Two letters, e.g. IN, US, GB. Blank = your phone's country (${java.util.Locale.getDefault().country.ifEmpty { "IN" }}).") })
                     GradientButton("Save", Modifier.fillMaxWidth()) {
                         ConfigStore.updateDiscoverKeys(tmdb, trakt)
+                        com.arrmada360.app.api.ClipFinder.geminiKey = gemini
+                        ConfigStore.putString("watchRegion", region.trim())
                         ctx.toast("Saved – Movies & TV tabs will refresh")
                     }
                 }
