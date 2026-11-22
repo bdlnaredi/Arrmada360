@@ -146,6 +146,8 @@ class StashApi(val cfg: ServiceConfig) {
             d.obj("version")?.str("version").orEmpty())
     }
 
+    fun fixArt(u: String): String? = fixUrl(u)
+
     private fun fixUrl(u: String): String? {
         if (u.isEmpty()) return null
         return try {
@@ -221,6 +223,47 @@ class StashApi(val cfg: ServiceConfig) {
         gql("mutation(${'$'}i: ScenesDestroyInput!) { scenesDestroy(input: ${'$'}i) }",
             JSONObject().put("i", JSONObject().put("ids", JSONArray().put(id)).put("delete_file", deleteFile).put("delete_generated", true)))
     }
+}
+
+data class StashPerformer(val id: String, val name: String, val image: String?, val gender: String, val birthdate: String)
+data class StashSceneDetail(
+    val scene: StashScene, val details: String, val code: String, val director: String, val urls: List<String>,
+    val studio: String, val studioImage: String?, val performers: List<StashPerformer>, val tags: List<String>,
+    val oCount: Int, val video: String, val audio: String, val fps: Double, val bitrate: Long, val width: Int,
+)
+
+suspend fun StashApi.sceneDetail(id: String): StashSceneDetail {
+    fun q(urlField: String) = """query(${'$'}id: ID!) { findScene(id: ${'$'}id) {
+        id title details date code director $urlField organized rating100 play_count o_counter
+        files { path size duration width height video_codec audio_codec frame_rate bit_rate basename }
+        paths { screenshot } studio { name image_path } performers { id name image_path gender birthdate } tags { name } } }"""
+    val vars = JSONObject().put("id", id)
+    val d = try { gql(q("urls"), vars) } catch (e: Exception) { gql(q("url"), vars) }
+    val s = d.obj("findScene") ?: throw Exception("Scene not found")
+    val art = cfg.artAllowed()
+    val file = s.arr("files").objects().firstOrNull()
+    val urls = s.optJSONArray("urls")?.let { a -> (0 until a.length()).map { a.optString(it) } } ?: listOfNotNull(s.optString("url").takeIf { it.isNotEmpty() })
+    val scene = StashScene(
+        id = s.str("id"), title = s.str("title").ifEmpty { file?.str("basename").orEmpty() }, date = s.str("date"),
+        studio = s.obj("studio")?.str("name").orEmpty(), performers = s.arr("performers").objects().map { it.str("name") },
+        duration = file?.dbl("duration") ?: 0.0, size = file?.long("size") ?: 0, height = file?.int("height") ?: 0,
+        screenshot = if (art) fixArt(s.obj("paths")?.str("screenshot").orEmpty()) else null,
+        plays = s.int("play_count"), rating = if (s.has("rating100") && !s.isNull("rating100")) s.int("rating100") else null,
+        organized = s.bool("organized"), path = file?.str("path").orEmpty(),
+    )
+    return StashSceneDetail(
+        scene, s.str("details"), s.str("code"), s.str("director"), urls.filter { it.isNotBlank() },
+        s.obj("studio")?.str("name").orEmpty(), if (art) s.obj("studio")?.str("image_path")?.let { fixArt(it) } else null,
+        s.arr("performers").objects().map { p -> StashPerformer(p.str("id"), p.str("name"), if (art) fixArt(p.str("image_path")) else null, p.str("gender"), p.str("birthdate")) },
+        s.arr("tags").objects().map { it.str("name") }, s.int("o_counter"),
+        listOf(file?.str("video_codec").orEmpty().uppercase(), file?.int("height")?.takeIf { it > 0 }?.let { "${it}p" }.orEmpty()).filter { it.isNotEmpty() }.joinToString(" · "),
+        file?.str("audio_codec").orEmpty().uppercase(), file?.dbl("frame_rate") ?: 0.0, file?.long("bit_rate") ?: 0, file?.int("width") ?: 0,
+    )
+}
+
+suspend fun StashApi.setRating(id: String, rating100: Int?) {
+    val i = JSONObject().put("id", id).put("rating100", rating100 ?: JSONObject.NULL)
+    gql("mutation(${'$'}i: SceneUpdateInput!) { sceneUpdate(input: ${'$'}i) { id } }", JSONObject().put("i", i))
 }
 
 @Suppress("unused") private fun keepEx(e: ApiException) = e

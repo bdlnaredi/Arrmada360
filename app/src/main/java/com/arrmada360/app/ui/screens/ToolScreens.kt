@@ -25,6 +25,10 @@ import com.arrmada360.app.api.KumaApi
 import com.arrmada360.app.api.KumaMonitor
 import com.arrmada360.app.api.StashApi
 import com.arrmada360.app.api.StashScene
+import com.arrmada360.app.api.sceneDetail
+import com.arrmada360.app.api.setRating
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import com.arrmada360.app.api.Whisparr
 import com.arrmada360.app.data.ServiceConfig
 import com.arrmada360.app.data.display
@@ -172,7 +176,7 @@ fun StashScreen(cfg: ServiceConfig, nav: Navigator, isRoot: Boolean, back: () ->
         Box(Modifier.padding(pad)) {
             when (tab) {
                 0 -> StashOverview(api)
-                1 -> StashScenes(api)
+                1 -> StashScenes(api, nav)
                 2 -> StashTasks(api)
                 else -> GenericServerTab(cfg, nav) {
                     item { Box(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) { PrivateArtSwitch(cfg) } }
@@ -240,7 +244,7 @@ private fun StashOverview(api: StashApi) {
 }
 
 @Composable
-private fun StashScenes(api: StashApi) {
+private fun StashScenes(api: StashApi, nav: Navigator) {
     var q by rememberSaveable { mutableStateOf("") }
     var submitted by rememberSaveable { mutableStateOf("") }
     val sorts = listOf("created_at" to "Newest", "date" to "Release date", "play_count" to "Most played", "rating" to "Rating", "filesize" to "Size")
@@ -258,7 +262,7 @@ private fun StashScenes(api: StashApi) {
             LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item { Text("$count scenes", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 items(list, key = { it.id }) { s ->
-                    Panel(Modifier.fillMaxWidth(), tint = StashBlue, onClick = { pick = s }) {
+                    Panel(Modifier.fillMaxWidth(), tint = StashBlue, onClick = { nav.push(Route.StashScene(api.cfg.id, s.id)) }) {
                         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (s.screenshot != null) { Poster(s.screenshot, Modifier.width(110.dp), ratio = 16f / 9f, corner = 8.dp); Spacer(Modifier.width(10.dp)) }
                             Column(Modifier.weight(1f)) {
@@ -279,31 +283,6 @@ private fun StashScenes(api: StashApi) {
             }
         }
     }
-    pick?.let { s ->
-        val uri = androidx.compose.ui.platform.LocalUriHandler.current
-        var confirmDelete by remember { mutableStateOf(false) }
-        AlertDialog(
-            onDismissRequest = { pick = null },
-            title = { Text(s.title, maxLines = 2) },
-            text = {
-                Column {
-                    if (s.path.isNotEmpty()) Text(s.path, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${humanBytes(s.size)} · played ${s.plays}×", style = MaterialTheme.typography.labelSmall)
-                    Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = { uri.openUri("${api.cfg.baseUrl}/scenes/${s.id}") }) { Text("Open in Stash") }
-                    TextButton(onClick = { pick = null; run(if (s.organized) "Marked as not organized" else "Marked as organized", { l.load(true) }) { api.setOrganized(s.id, !s.organized) } }) {
-                        Text(if (s.organized) "Mark as not organized" else "Mark as organized")
-                    }
-                    if (!confirmDelete) TextButton(onClick = { confirmDelete = true }) { Text("Delete…", color = Bad) }
-                    else {
-                        TextButton(onClick = { pick = null; run("Removed from Stash", { l.load(true) }) { api.deleteScene(s.id, false) } }) { Text("Remove from library only", color = Bad) }
-                        TextButton(onClick = { pick = null; run("Scene and file deleted", { l.load(true) }) { api.deleteScene(s.id, true) } }) { Text("Delete scene AND file", color = Bad, fontWeight = FontWeight.Bold) }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { pick = null }) { Text("Close") } },
-        )
-    }
 }
 
 @Composable
@@ -323,3 +302,146 @@ private fun StashTasks(api: StashApi) {
 }
 
 @Suppress("unused") private val keepShape = CircleShape
+
+
+// ------------------------------------------------------------ scene detail
+@Composable
+fun StashSceneScreen(cfg: ServiceConfig, sceneId: String, nav: Navigator, back: () -> Unit) {
+    val api = remember(cfg) { StashApi(cfg) }
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    val l = rememberLoadable(cfg, "stashscene", sceneId) { api.sceneDetail(sceneId) }
+    val run = rememberRunner()
+    var synopsisOpen by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    AppScaffold(title = l.data?.scene?.title ?: "Scene", isRoot = false, onBack = back, badge = cfg.type, badgeName = cfg.name) { pad ->
+        LoadableContent(l, Modifier.padding(pad)) { d ->
+            val s = d.scene
+            LazyColumn(contentPadding = PaddingValues(bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                item {
+                    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                        if (s.screenshot != null) coil.compose.AsyncImage(s.screenshot, null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.matchParentSize())
+                        else Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Filled.HideImage, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(40.dp))
+                            Text("Artwork hidden – turn on Show artwork in the Server tab", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                item {
+                    Column(Modifier.padding(horizontal = 16.dp)) {
+                        Text(s.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+                        val meta = listOf(d.studio, s.date, d.code).filter { it.isNotEmpty() }.joinToString(" · ")
+                        if (meta.isNotEmpty()) Text(meta, style = MaterialTheme.typography.titleSmall, color = StashBlue, fontWeight = FontWeight.Bold)
+                        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
+                            if (s.duration > 0) Pill(humanEta(s.duration.toLong()), Accent)
+                            if (d.video.isNotEmpty()) Pill(d.video, Accent2)
+                            if (d.audio.isNotEmpty()) Pill(d.audio, Pink)
+                            if (s.size > 0) Pill(humanBytes(s.size), MaterialTheme.colorScheme.onSurfaceVariant)
+                            s.rating?.let { Pill("★ " + (it / 20.0).toString().removeSuffix(".0"), Warn) }
+                            if (s.plays > 0) Pill("Played ${s.plays}×", Good)
+                            if (s.organized) Pill("Organized", Good)
+                        }
+                    }
+                }
+                item {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(onClick = { uri.openUri("${cfg.baseUrl}/scenes/${s.id}") }, modifier = Modifier.weight(1f)) { Icon(Icons.AutoMirrored.Filled.OpenInNew, null); Text(" Open") }
+                        FilledTonalButton(onClick = { run(if (s.organized) "Marked as not organized" else "Marked as organized", { l.load(true) }) { api.setOrganized(s.id, !s.organized) } }, modifier = Modifier.weight(1f)) {
+                            Icon(if (s.organized) Icons.Filled.CheckCircle else Icons.Filled.TaskAlt, null); Text(if (s.organized) " Organized" else " Organize")
+                        }
+                        FilledTonalButton(onClick = { confirmDelete = true }, colors = ButtonDefaults.filledTonalButtonColors(contentColor = Bad)) { Icon(Icons.Filled.Delete, "Delete") }
+                    }
+                }
+                item {
+                    Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Rating", style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(60.dp))
+                        (1..5).forEach { n ->
+                            val on = (s.rating ?: 0) >= n * 20
+                            IconButton(onClick = { run("Rated $n★", { l.load(true) }) { api.setRating(s.id, if (s.rating == n * 20) null else n * 20) } }, modifier = Modifier.size(36.dp)) {
+                                Icon(if (on) Icons.Filled.Star else Icons.Filled.StarBorder, "$n stars", tint = Warn)
+                            }
+                        }
+                    }
+                }
+                if (d.details.isNotBlank()) item {
+                    Column(Modifier.padding(horizontal = 16.dp)) {
+                        Text("Synopsis", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(d.details, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = if (synopsisOpen) 200 else 5, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 4.dp).clickable { synopsisOpen = !synopsisOpen })
+                    }
+                }
+                if (d.performers.isNotEmpty()) item {
+                    Column {
+                        SectionTitle("Performers")
+                        androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            items(d.performers, key = { it.id }) { p ->
+                                Column(Modifier.width(96.dp).clickable { uri.openUri("${cfg.baseUrl}/performers/${p.id}") }, horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Box(Modifier.size(width = 96.dp, height = 128.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                                        Text(p.name.take(1), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                                        if (p.image != null) coil.compose.AsyncImage(p.image, p.name, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.matchParentSize())
+                                    }
+                                    Text(p.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
+                                    val age = runCatching { java.time.Period.between(java.time.LocalDate.parse(p.birthdate), runCatching { java.time.LocalDate.parse(s.date) }.getOrDefault(java.time.LocalDate.now())).years }.getOrNull()
+                                    val sub = listOfNotNull(p.gender.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }.takeIf { it.isNotEmpty() }, age?.let { "$it in scene" }).joinToString(" · ")
+                                    if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+                }
+                if (d.studio.isNotEmpty()) item {
+                    Panel(Modifier.fillMaxWidth().padding(horizontal = 12.dp), tint = StashBlue) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(width = 96.dp, height = 48.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                                if (d.studioImage != null) coil.compose.AsyncImage(d.studioImage, d.studio, contentScale = androidx.compose.ui.layout.ContentScale.Fit, modifier = Modifier.matchParentSize().padding(4.dp))
+                                else Icon(Icons.Filled.Business, null)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Studio", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(d.studio, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                if (d.director.isNotEmpty()) Text("Director: ${d.director}", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
+                if (d.tags.isNotEmpty()) item {
+                    Column(Modifier.padding(horizontal = 16.dp)) {
+                        Text("Tags", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
+                            d.tags.forEach { Pill(it, Accent2) }
+                        }
+                    }
+                }
+                item {
+                    Panel(Modifier.fillMaxWidth().padding(horizontal = 12.dp), tint = Accent) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("File", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            if (s.path.isNotEmpty()) Text(s.path, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            val specs = listOfNotNull(
+                                if (d.width > 0 && s.height > 0) "${d.width}×${s.height}" else null,
+                                if (d.fps > 0) "%.2f fps".format(d.fps) else null,
+                                if (d.bitrate > 0) "%.1f Mbps".format(d.bitrate / 1_000_000.0) else null,
+                            )
+                            if (specs.isNotEmpty()) Text(specs.joinToString(" · "), style = MaterialTheme.typography.labelSmall)
+                            d.urls.forEach { u -> Text(u, style = MaterialTheme.typography.labelSmall, color = StashBlue, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.clickable { uri.openUri(u) }) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (confirmDelete) l.data?.scene?.let { s ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false }, title = { Text("Delete ${s.title}?") },
+            text = { Text("Remove it from Stash only, or delete the video file too.") },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = { confirmDelete = false; run("Removed from Stash", { back() }) { api.deleteScene(s.id, false) } }) { Text("Remove from library", color = Bad) }
+                    TextButton(onClick = { confirmDelete = false; run("Scene and file deleted", { back() }) { api.deleteScene(s.id, true) } }) { Text("Delete scene AND file", color = Bad, fontWeight = FontWeight.Bold) }
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+        )
+    }
+}
