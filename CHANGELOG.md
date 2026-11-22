@@ -8,6 +8,21 @@ Builds #2, #5, #10, #15, #18, #19, #29, #33, #35 and #38 failed to compile in CI
 
 ---
 
+## [1.0.42] – build #42
+
+### Added
+- **Cast & crew pages:** tap anyone in a movie or show's cast or crew to see their photo, biography, birthday and birthplace, and their full filmography.
+  - Filter by movies or TV, acting or crew, popular, newest or oldest, and titles not in your library.
+  - Titles you own show a library badge and open straight to their page. Everything else has a + to add it to Radarr or Sonarr.
+- **Cast for TV shows:** Sonarr shows now have a cast row, from TMDB or Seerr.
+- "Popular people" on the Movies and TV tabs opens the same person page.
+- **Stasharr scene page:** tap a scene to see:
+  - its screenshot, title, studio, date and code
+  - quality, size and play count
+  - a 1–5 star rating you can set
+  - the synopsis, performers with photos and age in the scene, the studio logo, tags, and file details
+  - Open, Organize and Delete buttons
+
 ## [1.0.40] – build #40
 
 ### Added
