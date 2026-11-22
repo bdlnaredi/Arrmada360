@@ -250,6 +250,12 @@ fun ArrServerTab(api: ArrApi, nav: Navigator) {
         }
         item { MenuRow(Icons.Filled.Public, "View on web", "Open ${t.label} in your browser", t.tint2, external = true) { uri.openUri(cfg.baseUrl) } }
         if (t.privateArt) item { Box(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) { com.arrmada360.app.ui.PrivateArtSwitch(cfg) } }
+        if (at == ServiceType.RADARR && t != ServiceType.WHISPARR) item {
+            MenuRow(Icons.Filled.CollectionsBookmark, "Collections", "Franchises you own – add the missing movies in one tap", Rainbow[3]) { nav.push(Route.ArrCollections(cfg.id, null)) }
+        }
+        if ((at == ServiceType.RADARR || at == ServiceType.SONARR) && t != ServiceType.WHISPARR) item {
+            MenuRow(Icons.Filled.HighQuality, "Quality & duplicates", "Below cutoff, low quality, missing subtitles and duplicates", Rainbow[4]) { nav.push(Route.ArrQuality(cfg.id)) }
+        }
         if (t.isArr) {
             item { MenuRow(Icons.Filled.DriveFileMove, "Manual import", "Import files from a folder or a stuck download", Rainbow[1]) { nav.push(Route.ManualImport(cfg.id)) } }
             item { MenuRow(Icons.Filled.RssFeed, "RSS sync", "Check your indexers for new releases now", Rainbow[3], arrow = false) { run("RSS sync started") { api.runTask("RssSync") } } }
@@ -813,6 +819,7 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                     }
                 }
                 item { FactsRow(cfg, m) }
+                if (cfg.type != ServiceType.WHISPARR) item { com.arrmada360.app.ui.screens.TrailerAndStreaming(api, m, nav) }
                 if (m.overview.isNotEmpty()) item {
                     Text(
                         m.overview, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,

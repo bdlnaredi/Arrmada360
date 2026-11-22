@@ -169,7 +169,7 @@ class ArrApi(val cfg: ServiceConfig) {
         Http.exec(client, rb(path, q).put(body.jsonBody()).build())
     suspend fun delete(path: String, q: Map<String, Any?> = emptyMap()) = Http.exec(client, rb(path, q).delete().build())
 
-    private suspend fun fetchList(path: String, q: Map<String, Any?> = emptyMap()): List<JSONObject> = withContext(Dispatchers.Default) {
+    suspend fun fetchList(path: String, q: Map<String, Any?> = emptyMap()): List<JSONObject> = withContext(Dispatchers.Default) {
         val s = get(path, q)
         val t = s.trim()
         if (t.startsWith("{")) JSONObject(t).arr("records").objects() else JSONArray(t).objects()

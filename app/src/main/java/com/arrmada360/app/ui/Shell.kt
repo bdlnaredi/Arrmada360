@@ -80,6 +80,8 @@ sealed interface Route {
     data class Service(val id: String) : Route
     data class ArrDetail(val serviceId: String, val itemId: Int) : Route
     data object YearReview : Route
+    data class ArrCollections(val serviceId: String, val focusTmdb: Int?) : Route
+    data class ArrQuality(val serviceId: String) : Route
     data class ArrAdd(val serviceId: String, val term: String = "") : Route
     data object Settings : Route
     data object AddService : Route
@@ -245,6 +247,12 @@ private fun RouteContent(r: Route, nav: Navigator) {
                 EmptyBox("This service was removed.")
             } else ServiceTheme(cfg.type, ConfigStore.amoled) { ServiceRoot(cfg, nav, isRoot, back) }
         }
+        is Route.ArrCollections -> ConfigStore.get(r.serviceId)?.let { cfg ->
+            ServiceTheme(cfg.type, ConfigStore.amoled) { com.arrmada360.app.ui.screens.CollectionsScreen(cfg, r.focusTmdb, nav, back) }
+        } ?: EmptyBox("Service missing")
+        is Route.ArrQuality -> ConfigStore.get(r.serviceId)?.let { cfg ->
+            ServiceTheme(cfg.type, ConfigStore.amoled) { com.arrmada360.app.ui.screens.QualityFinderScreen(cfg, nav, back) }
+        } ?: EmptyBox("Service missing")
         is Route.ArrDetail -> ConfigStore.get(r.serviceId)?.let { cfg ->
             ServiceTheme(cfg.type, ConfigStore.amoled) { ArrDetailScreen(cfg, r.itemId, nav, back) }
         } ?: EmptyBox("Service missing")

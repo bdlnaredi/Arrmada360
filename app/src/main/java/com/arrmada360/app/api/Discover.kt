@@ -47,7 +47,7 @@ data class DiscoverRow<T>(val items: List<T>, val source: String)
 object Discover {
     private val client get() = Http.client(false)
     fun seerr(): ServiceConfig? = ConfigStore.services.firstOrNull { it.type == ServiceType.SEERR }
-    private fun tmdbKey() = ConfigStore.tmdbKey.trim()
+    fun tmdbKey() = ConfigStore.tmdbKey.trim()
     private fun traktId() = ConfigStore.traktClientId.trim()
     fun hasAnySource() = seerr() != null || tmdbKey().isNotEmpty() || traktId().isNotEmpty()
 
@@ -55,7 +55,7 @@ object Discover {
     private fun traktPath(type: String) = if (type == "movie") "movies" else "shows"
 
     // ------------------------------------------------------------ raw clients
-    private suspend fun tmdb(path: String, q: Map<String, Any?> = emptyMap()): JSONObject {
+    suspend fun tmdb(path: String, q: Map<String, Any?> = emptyMap()): JSONObject {
         val key = tmdbKey()
         val bearer = key.length > 40
         val qq = q.toMutableMap()
