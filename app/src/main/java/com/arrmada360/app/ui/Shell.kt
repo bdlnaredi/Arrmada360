@@ -84,6 +84,7 @@ sealed interface Route {
     data class Service(val id: String) : Route
     data class ArrDetail(val serviceId: String, val itemId: Int) : Route
     data object YearReview : Route
+    data class Person(val id: Int, val name: String) : Route
     data class ClipFinder(val uri: String, val mime: String?) : Route
     data class LinkLookup(val link: String) : Route
     data object SettingsFamily : Route
@@ -230,7 +231,7 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
 /** What family members are allowed to open. */
 private fun familyAllows(r: Route): Boolean = when (r) {
     Route.Dashboard, Route.YearReview, Route.Changelog -> true
-    is Route.ClipFinder, is Route.LinkLookup, is Route.ArrDetail -> true
+    is Route.ClipFinder, is Route.LinkLookup, is Route.ArrDetail, is Route.Person -> true
     is Route.Service -> com.arrmada360.app.data.Family.canOpen(r.id)
     is Route.Search -> true
     else -> false
@@ -244,6 +245,7 @@ private fun RouteContent(r: Route, nav: Navigator) {
     when (r) {
         Route.Dashboard -> DashboardScreen(nav)
         is Route.ClipFinder -> com.arrmada360.app.ui.screens.ClipFinderScreen(r.uri, r.mime, nav, back)
+        is Route.Person -> com.arrmada360.app.ui.screens.PersonScreen(r.id, r.name, nav, back)
         is Route.LinkLookup -> com.arrmada360.app.ui.screens.LinkLookupScreen(r.link, nav, back)
         Route.SettingsFamily -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.FamilySettingsScreen(back) }
         Route.Settings -> com.arrmada360.app.ui.screens.SettingsGate(back) { SettingsScreen(nav, isRoot, back) }

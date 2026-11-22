@@ -42,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -172,7 +173,7 @@ fun DiscoverTab(isMovie: Boolean, arr: ServiceConfig?, nav: Navigator) {
     }
 
     openItem?.let { i -> DiscoverSheet(i, isMovie, lib.data, nav) { openItem = null } }
-    openPerson?.let { p -> PersonSheet(p) { openPerson = null } }
+    openPerson?.let { p -> LaunchedEffect(p) { openPerson = null; nav.push(Route.Person(p.id, p.name)) } }
 }
 
 @Composable

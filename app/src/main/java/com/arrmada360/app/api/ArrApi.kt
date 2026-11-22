@@ -616,12 +616,12 @@ class ArrApi(val cfg: ServiceConfig) {
         put("$libPath/$id", o.toString())
     }
 
-    data class Credit(val name: String, val role: String, val image: String?, val crew: Boolean)
+    data class Credit(val name: String, val role: String, val image: String?, val crew: Boolean, val personId: Int = 0)
     /** Radarr: cast & crew. */
     suspend fun credits(movieId: Int): List<Credit> = if (type != ServiceType.RADARR) emptyList() else
         fetchList("credit", mapOf("movieId" to movieId)).map {
             val crew = it.str("type") == "crew"
-            Credit(it.str("personName"), if (crew) it.str("job") else it.str("character"), if (cfg.artAllowed()) image(it, "headshot") else null, crew)
+            Credit(it.str("personName"), if (crew) it.str("job") else it.str("character"), if (cfg.artAllowed()) image(it, "headshot") else null, crew, it.int("personTmdbId"))
         }
 
     /** History of one movie or series. */

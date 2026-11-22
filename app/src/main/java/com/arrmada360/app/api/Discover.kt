@@ -65,7 +65,7 @@ object Discover {
         return JSONObject(Http.exec(client, b.build()))
     }
 
-    private suspend fun seerrGet(path: String, q: Map<String, Any?> = emptyMap()): JSONObject {
+    suspend fun seerrGet(path: String, q: Map<String, Any?> = emptyMap()): JSONObject {
         val c = seerr() ?: throw Exception("no seerr")
         return JSONObject(Http.exec(Http.client(c.trustAllCerts), Request.Builder().url(buildUrl("${c.baseUrl}/api/v1/$path", q)).header("X-Api-Key", c.apiKey).build()))
     }

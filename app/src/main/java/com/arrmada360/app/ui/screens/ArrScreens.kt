@@ -853,10 +853,8 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                         if (genres != null && genres.length() > 0) InfoLine("Genres", (0 until genres.length()).joinToString { genres.optString(it) })
                     }
                 }
-                if (cfg.arrType == ServiceType.RADARR) {
-                    item { MovieFileCard(m) }
-                    item { CastRow(api, itemId) }
-                }
+                if (cfg.arrType == ServiceType.RADARR) item { MovieFileCard(m) }
+                if ((cfg.arrType == ServiceType.RADARR || cfg.arrType == ServiceType.SONARR) && cfg.type != ServiceType.WHISPARR) item { CastRow(api, m, nav) }
                 item {
                     Row(Modifier.fillMaxWidth().clickable { showHistory = !showHistory }.padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         SectionTitle("History", Modifier.weight(1f))
@@ -1351,22 +1349,47 @@ private fun MovieFileCard(m: MediaItem) {
 }
 
 @Composable
-private fun CastRow(api: ArrApi, id: Int) {
-    val l = rememberLoadable(api.cfg, id, "credits") { api.credits(id) }
-    val cast = l.data?.filter { !it.crew }?.take(20).orEmpty()
-    if (cast.isEmpty()) return
+private fun CastRow(api: ArrApi, m: MediaItem, nav: Navigator) {
+    val l = rememberLoadable(api.cfg, m.id, "credits2") {
+        if (api.type == ServiceType.RADARR) api.credits(m.id).ifEmpty { emptyList() } else com.arrmada360.app.api.People.tvCast(m)
+    }
+    val all = l.data.orEmpty()
+    val cast = all.filter { !it.crew }.take(30)
+    val crew = all.filter { it.crew && it.role in setOf("Director", "Screenplay", "Writer", "Producer", "Original Music Composer", "Director of Photography", "Novel", "Creator") }
+        .groupBy { it.personId to it.name }.map { (_, v) -> v.first().copy(role = v.map { it.role }.distinct().joinToString(", ")) }.take(12)
+    if (cast.isEmpty() && crew.isEmpty()) {
+        if (api.type == ServiceType.SONARR && !com.arrmada360.app.api.People.available && l.data != null)
+            Text("Add a TMDB key in Settings → Discovery sources to see the cast.", style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+        return
+    }
+    val open = { c: ArrApi.Credit -> if (c.personId > 0) nav.push(Route.Person(c.personId, c.name)) }
     Column {
-        SectionTitle("Cast")
-        androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(cast) { c ->
-                Column(Modifier.width(84.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(72.dp).clip(androidx.compose.foundation.shape.CircleShape).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                        Text(c.name.take(1), fontWeight = FontWeight.Bold)
-                        if (c.image != null) AsyncImage(c.image, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize().clip(androidx.compose.foundation.shape.CircleShape))
-                    }
-                    Text(c.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
-                    Text(c.role, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        if (cast.isNotEmpty()) {
+            SectionTitle("Cast")
+            PeopleStrip(cast, open)
+        }
+        if (crew.isNotEmpty()) {
+            SectionTitle("Crew")
+            PeopleStrip(crew, open)
+        }
+        Text("Tap a person for their biography and filmography", style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+    }
+}
+
+@Composable
+private fun PeopleStrip(list: List<ArrApi.Credit>, onClick: (ArrApi.Credit) -> Unit) {
+    androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        items(list) { c ->
+            Column(Modifier.width(84.dp).clip(RoundedCornerShape(12.dp)).clickable(enabled = c.personId > 0) { onClick(c) }.padding(vertical = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.size(72.dp).clip(androidx.compose.foundation.shape.CircleShape).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                    Text(c.name.take(1), fontWeight = FontWeight.Bold)
+                    if (c.image != null) AsyncImage(c.image, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize().clip(androidx.compose.foundation.shape.CircleShape))
                 }
+                Text(c.name, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
+                Text(c.role, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
     }
