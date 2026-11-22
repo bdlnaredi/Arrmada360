@@ -4,9 +4,37 @@ All notable changes to Arrmada360 are listed here, newest first.
 Every successful build on `main` is published as **`Arrmada360.apk`** in the [latest release](../../releases/latest).
 The app version is `1.0.<build number>`. The build number is shown in *Settings* and in the release title.
 
-Builds #2, #5, #10, #15, #18, #19, #29 and #33 failed to compile in CI and were fixed straight away in builds #3, #6, #11, #16, #20, #30 and #34, so there is no APK for them.
+Builds #2, #5, #10, #15, #18, #19, #29, #33, #35 and #38 failed to compile in CI and were fixed straight away in builds #3, #6, #11, #16, #20, #30, #34, #36 and #39, so there is no APK for them.
 
 ---
+
+## [1.0.40] – build #40
+
+### Added
+- **Trailers:** a Trailer button on every movie and show page, which opens YouTube.
+- **Where to watch:** streaming, free, rent and buy services for your country, via TMDB and JustWatch. You can set the country in *Discovery sources*.
+- **Radarr collections:** see every franchise you own, how complete it is, and add the missing movies one at a time or all at once.
+- **Quality & duplicates** (Server tab of Radarr and Sonarr):
+  - items below your quality cutoff
+  - low-quality movies (SD, 720p or 1080p and below)
+  - movies with no subtitles
+  - titles duplicated across instances
+  - select and search for upgrades in bulk
+- **Speed scheduler:** limited download and upload speeds between set times, full speed the rest of the day. Works with qBittorrent, Transmission, Deluge, SABnzbd and NZBGet.
+- **Seeding manager:**
+  - finished torrents with their ratio and seeding time
+  - rules by ratio and days, filtered by category
+  - bulk removal, optionally with the files
+  - optional automatic clean-up with a notification
+- **Unraid live graphs:** CPU, RAM and per-thread charts every 3 seconds, plus a 24-hour history the app samples in the background.
+- **Unraid logs:** a viewer for every Unraid log file and for each container's own log, with search, an errors-only filter and sharing.
+- **Daily summary:** one morning notification listing what downloaded, what's airing today, health warnings, Kuma monitors that are down, and low disk space.
+- **Voice search:** a microphone in the dashboard search bar. Saying "add Dune Part Two" searches for it.
+- **Family mode:** a read-only profile with only the apps you choose, protected by a PIN. Adding, editing and deleting are hidden, and Settings is locked.
+- **What is this?** Share a video clip or screenshot from WhatsApp, Telegram or your gallery to Arrmada360, or tap the clip icon in the search bar.
+  - Gemini (free key) recognises movies and TV; trace.moe recognises anime.
+  - Shows the title, year, season and episode with a confidence score, and lets you view or add it.
+- **IMDb and TMDB links** open in Arrmada360 when you share them or open them with the app.
 
 ## [1.0.34] – build #34
 

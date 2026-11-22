@@ -231,6 +231,18 @@ Needs Namer running in watchdog mode with its web UI turned on (default port 698
   - the side menu stays open on wide screens
   - the library and details sit side by side
   - posters and cards light up as you move around with a TV remote
+- **Trailers and where to watch** on every movie and show page (where-to-watch needs a free TMDB key).
+- **Radarr collections:** franchises you own, with one-tap "add missing".
+- **Quality & duplicates:** below cutoff, low quality, no subtitles, and duplicates across instances, with bulk upgrade search.
+- **Speed scheduler** (*Dashboard → Server*): slower speeds between set times, full speed the rest of the day.
+- **Seeding manager** (*Dashboard → Server*): ratio and seed-time rules, bulk remove, and optional automatic clean-up.
+- **Unraid live graphs and logs:** CPU, RAM and thread charts, 24-hour history, and a log viewer for system logs and each container.
+- **Daily summary notification** (*Settings → Notifications*).
+- **Voice search:** tap the mic in the dashboard search bar.
+- **Family mode** (*Settings → General → Security*): a PIN-protected, read-only profile.
+- **What is this?** Share a clip or screenshot from WhatsApp, Telegram or your gallery to Arrmada360 to find out which movie or show it is.
+  - Needs a free Gemini key for movies and TV (*Settings → Discovery sources*). Anime works without one.
+  - IMDb and TMDB links open straight in the app.
 - **Offline cache:** your libraries, calendars and stats still show, with an "Offline" banner, when a server can't be reached.
 - **Self-signed HTTPS** support for each app.
 
