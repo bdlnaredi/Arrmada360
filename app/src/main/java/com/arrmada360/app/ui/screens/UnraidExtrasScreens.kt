@@ -56,6 +56,7 @@ fun UnraidLiveScreen(cfg: ServiceConfig, back: () -> Unit) {
             delay(3000)
         }
     }
+    val hist = remember(last, tab) { UnraidHistory.load(cfg) }
     AppScaffold(title = "Live graphs", isRoot = false, onBack = back, badge = cfg.type, badgeName = cfg.name) { pad ->
         LazyColumn(Modifier.padding(pad), contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item { ChipRow(listOf("Live (10 min)", "Last 24 hours"), tab, { tab = it }) }
@@ -86,7 +87,6 @@ fun UnraidLiveScreen(cfg: ServiceConfig, back: () -> Unit) {
                 }
                 item { Text("Updates every 3 seconds while this screen is open.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             } else {
-                val hist = remember(last) { UnraidHistory.load(cfg) }
                 if (hist.size < 2) item {
                     EmptyBox("Collecting data… Arrmada360 saves a sample about every 15 minutes in the background, so the chart fills in over the day.")
                 } else {
