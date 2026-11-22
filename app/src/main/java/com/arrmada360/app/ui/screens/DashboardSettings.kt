@@ -1,6 +1,8 @@
 package com.arrmada360.app.ui.screens
 
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -492,6 +494,25 @@ fun ServerInfoTab(services: List<ServiceConfig>, nav: Navigator) {
                     Text("Downloads per month, data grabbed, top genres and Plex stats", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f))
                 }
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.White)
+            }
+        }
+        if (downloaders.isNotEmpty()) item(key = "dltools") {
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val sched = com.arrmada360.app.notify.SpeedSchedule
+                Panel(Modifier.weight(1f), tint = Warn, onClick = { nav.push(Route.SpeedScheduler) }) {
+                    Column(Modifier.padding(14.dp)) {
+                        Icon(Icons.Filled.Schedule, null, tint = Warn)
+                        Text("Speed scheduler", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Text(if (sched.enabled) "${sched.fmt(sched.startMin)}–${sched.fmt(sched.endMin)} limited" else "Off", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Panel(Modifier.weight(1f), tint = Good, onClick = { nav.push(Route.SeedingManager) }) {
+                    Column(Modifier.padding(14.dp)) {
+                        Icon(Icons.Filled.CloudUpload, null, tint = Good)
+                        Text("Seeding manager", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Text(if (com.arrmada360.app.notify.SeedRules.autoClean) "Auto-clean on" else "Ratio & seed time", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
         }
         item(key = "disk") { DiskSpaceCard(arrs, nav) }

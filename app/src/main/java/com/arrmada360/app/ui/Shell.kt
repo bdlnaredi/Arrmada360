@@ -80,6 +80,8 @@ sealed interface Route {
     data class Service(val id: String) : Route
     data class ArrDetail(val serviceId: String, val itemId: Int) : Route
     data object YearReview : Route
+    data object SpeedScheduler : Route
+    data object SeedingManager : Route
     data class ArrCollections(val serviceId: String, val focusTmdb: Int?) : Route
     data class ArrQuality(val serviceId: String) : Route
     data class ArrAdd(val serviceId: String, val term: String = "") : Route
@@ -230,6 +232,8 @@ private fun RouteContent(r: Route, nav: Navigator) {
         Route.SettingsDiscovery -> com.arrmada360.app.ui.screens.SettingsGate(back) { com.arrmada360.app.ui.screens.DiscoverySettingsScreen(back) }
         Route.Health -> com.arrmada360.app.ui.screens.HealthScreen(nav, isRoot, back)
         Route.YearReview -> com.arrmada360.app.ui.screens.YearReviewScreen(back)
+        Route.SpeedScheduler -> com.arrmada360.app.ui.screens.SpeedSchedulerScreen(back)
+        Route.SeedingManager -> com.arrmada360.app.ui.screens.SeedingManagerScreen(back)
         Route.AddService -> ServicePickerScreen(
             title = "Add a service", subtitle = "Pick an app to connect",
             multi = false, initial = emptySet(), onBack = back,

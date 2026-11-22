@@ -1,0 +1,141 @@
+package com.arrmada360.app.notify
+
+import android.content.Context
+import androidx.work.CoroutineWorker
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.WorkerParameters
+import com.arrmada360.app.api.DlItem
+import com.arrmada360.app.api.DownloadClients
+import com.arrmada360.app.data.ConfigStore
+import com.arrmada360.app.data.ServiceConfig
+import com.arrmada360.app.data.ServiceType
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import java.time.LocalTime
+import java.util.concurrent.TimeUnit
+
+/** Day/night speed limits applied to every download client. */
+object SpeedSchedule {
+    var enabled: Boolean
+        get() = ConfigStore.flag("speedSched")
+        set(v) = ConfigStore.setFlag("speedSched", v)
+    /** Minutes after midnight when the limited period starts / ends. */
+    var startMin: Int
+        get() = ConfigStore.getInt("speedSchedStart", 9 * 60)
+        set(v) = ConfigStore.putInt("speedSchedStart", v)
+    var endMin: Int
+        get() = ConfigStore.getInt("speedSchedEnd", 23 * 60)
+        set(v) = ConfigStore.putInt("speedSchedEnd", v)
+    var limitDown: Int
+        get() = ConfigStore.getInt("speedSchedDown", 2048)
+        set(v) = ConfigStore.putInt("speedSchedDown", v)
+    var limitUp: Int
+        get() = ConfigStore.getInt("speedSchedUp", 512)
+        set(v) = ConfigStore.putInt("speedSchedUp", v)
+    var fullDown: Int
+        get() = ConfigStore.getInt("speedSchedFullDown", 0)
+        set(v) = ConfigStore.putInt("speedSchedFullDown", v)
+    var fullUp: Int
+        get() = ConfigStore.getInt("speedSchedFullUp", 0)
+        set(v) = ConfigStore.putInt("speedSchedFullUp", v)
+    /** Client ids the schedule applies to (empty = all that support it). */
+    var clients: Set<String>
+        get() = ConfigStore.getStringSet("speedSchedClients")
+        set(v) = ConfigStore.putStringSet("speedSchedClients", v)
+
+    fun inLimitedWindow(now: LocalTime = LocalTime.now()): Boolean {
+        val m = now.hour * 60 + now.minute
+        return if (startMin <= endMin) m in startMin until endMin else (m >= startMin || m < endMin)
+    }
+
+    fun targets(): List<ServiceConfig> = ConfigStore.services.filter { it.type.isDownloader }
+        .filter { clients.isEmpty() || it.id in clients }
+        .filter { DownloadClients.of(it)?.supportsSpeedLimit == true }
+
+    /** Applies the right limits now. Returns (limited?, clients changed). */
+    suspend fun applyNow(force: Boolean = false): Pair<Boolean, Int> = coroutineScope {
+        val limited = inLimitedWindow()
+        val mode = if (limited) "limited" else "full"
+        if (!force && ConfigStore.getString("speedSchedLast") == mode) return@coroutineScope limited to 0
+        val (d, u) = if (limited) limitDown to limitUp else fullDown to fullUp
+        val n = targets().map { c -> async { try { DownloadClients.of(c)?.setSpeedLimits(d.toLong(), u.toLong()); 1 } catch (e: Exception) { 0 } } }.awaitAll().sum()
+        if (n > 0) ConfigStore.putString("speedSchedLast", mode)
+        limited to n
+    }
+
+    fun fmt(min: Int) = "%02d:%02d".format(min / 60, min % 60)
+}
+
+/** Automatic clean-up of finished torrents by ratio or seeding time. */
+object SeedRules {
+    var autoClean: Boolean
+        get() = ConfigStore.flag("seedAuto")
+        set(v) = ConfigStore.setFlag("seedAuto", v)
+    var minRatio: Float
+        get() = ConfigStore.getInt("seedRatioX10", 20) / 10f
+        set(v) = ConfigStore.putInt("seedRatioX10", (v * 10).toInt())
+    var minDays: Int
+        get() = ConfigStore.getInt("seedDays", 14)
+        set(v) = ConfigStore.putInt("seedDays", v)
+    /** "ratio", "days" or "either" */
+    var mode: String
+        get() = ConfigStore.getString("seedMode").ifEmpty { "either" }
+        set(v) = ConfigStore.putString("seedMode", v)
+    var deleteData: Boolean
+        get() = ConfigStore.flag("seedDeleteData")
+        set(v) = ConfigStore.setFlag("seedDeleteData", v)
+    /** Only touch torrents in these categories (empty = every category). */
+    var categories: String
+        get() = ConfigStore.getString("seedCats")
+        set(v) = ConfigStore.putString("seedCats", v)
+
+    val torrentTypes = setOf(ServiceType.QBITTORRENT, ServiceType.TRANSMISSION, ServiceType.DELUGE, ServiceType.RUTORRENT)
+
+    fun matches(d: DlItem): Boolean {
+        if (!d.done) return false
+        val cats = categories.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (cats.isNotEmpty() && cats.none { it.equals(d.category, true) }) return false
+        val r = d.ratio >= 0 && d.ratio >= minRatio
+        val t = d.seedTime >= 0 && d.seedTime >= minDays * 86400L
+        return when (mode) { "ratio" -> r; "days" -> t; else -> r || t }
+    }
+}
+
+class AutomationWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
+    companion object {
+        private const val NAME = "arrmada360-automation"
+        fun schedule(ctx: Context) {
+            val need = SpeedSchedule.enabled || SeedRules.autoClean
+            val wm = WorkManager.getInstance(ctx)
+            if (!need) { wm.cancelUniqueWork(NAME); return }
+            wm.enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.KEEP, PeriodicWorkRequestBuilder<AutomationWorker>(15, TimeUnit.MINUTES).build())
+        }
+    }
+
+    override suspend fun doWork(): Result {
+        ConfigStore.init(applicationContext)
+        com.arrmada360.app.net.NetSwitch.start(applicationContext)
+        if (SpeedSchedule.enabled) try { SpeedSchedule.applyNow() } catch (e: Exception) { }
+        if (SeedRules.autoClean) try { clean() } catch (e: Exception) { }
+        return Result.success()
+    }
+
+    private suspend fun clean() = coroutineScope {
+        val clients = ConfigStore.services.filter { it.type in SeedRules.torrentTypes }
+        val removed = clients.map { c ->
+            async {
+                try {
+                    val dc = DownloadClients.of(c) ?: return@async emptyList<String>()
+                    val hit = dc.snapshot().items.filter { SeedRules.matches(it) }
+                    if (hit.isNotEmpty()) dc.delete(hit.map { it.id }, SeedRules.deleteData)
+                    hit.map { it.name }
+                } catch (e: Exception) { emptyList() }
+            }
+        }.awaitAll().flatten()
+        if (removed.isNotEmpty()) Notifier.post(applicationContext, 777001, "Seeding manager removed ${removed.size} torrent${if (removed.size == 1) "" else "s"}",
+            removed.take(6).joinToString("\n") + if (removed.size > 6) "\n…" else "", null)
+    }
+}

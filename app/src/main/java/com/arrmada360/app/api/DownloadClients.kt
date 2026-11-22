@@ -41,6 +41,8 @@ data class DlItem(
     val ratio: Double = -1.0,
     val error: Boolean = false,
     val addedOn: Long = 0,
+    /** Seconds spent seeding, or -1 when the client doesn't say. */
+    val seedTime: Long = -1,
 )
 
 data class DlSnapshot(val items: List<DlItem>, val dlSpeed: Long, val upSpeed: Long, val globalPaused: Boolean = false, val freeSpace: Long = -1)
@@ -120,6 +122,9 @@ interface DownloadClient {
     suspend fun addUrl(url: String, category: String?) = addUrl(url)
     suspend fun pauseAll()
     suspend fun resumeAll()
+    /** Global speed limits in KB/s; 0 means unlimited. */
+    val supportsSpeedLimit: Boolean get() = false
+    suspend fun setSpeedLimits(downKB: Long, upKB: Long) {}
     suspend fun history(): List<DlHistory> = emptyList()
     val hasHistory: Boolean get() = false
     val isUsenet: Boolean get() = false
@@ -199,6 +204,12 @@ class QbitClient(override val cfg: ServiceConfig) : DownloadClient, RssClient {
 
     override suspend fun version() = "qBittorrent " + call("app/version")
 
+    override val supportsSpeedLimit get() = true
+    override suspend fun setSpeedLimits(downKB: Long, upKB: Long) {
+        call("transfer/setDownloadLimit", mapOf("limit" to (downKB * 1024).toString()))
+        call("transfer/setUploadLimit", mapOf("limit" to (upKB * 1024).toString()))
+    }
+
     override suspend fun snapshot(): DlSnapshot {
         val list = JSONArray(call("torrents/info")).objects().map { o ->
             val st = o.str("state")
@@ -209,6 +220,7 @@ class QbitClient(override val cfg: ServiceConfig) : DownloadClient, RssClient {
                 dlSpeed = o.long("dlspeed"), upSpeed = o.long("upspeed"), size = o.long("size"),
                 eta = o.long("eta").let { if (it >= 8640000) -1 else it }, category = o.str("category"),
                 ratio = o.dbl("ratio"), error = st == "error" || st == "missingFiles", addedOn = o.long("added_on"),
+                seedTime = if (o.has("seeding_time")) o.long("seeding_time") else -1,
             )
         }
         val t = JSONObject(call("transfer/info"))
@@ -365,8 +377,14 @@ class TransmissionClient(override val cfg: ServiceConfig) : DownloadClient {
 
     override suspend fun version() = "Transmission " + rpc("session-get").str("version")
 
+    override val supportsSpeedLimit get() = true
+    override suspend fun setSpeedLimits(downKB: Long, upKB: Long) {
+        rpc("session-set", JSONObject().put("speed-limit-down-enabled", downKB > 0).put("speed-limit-down", downKB.coerceAtLeast(1))
+            .put("speed-limit-up-enabled", upKB > 0).put("speed-limit-up", upKB.coerceAtLeast(1)))
+    }
+
     override suspend fun snapshot(): DlSnapshot {
-        val fields = JSONArray(listOf("id", "name", "percentDone", "status", "rateDownload", "rateUpload", "totalSize", "eta", "uploadRatio", "error", "labels", "addedDate", "leftUntilDone"))
+        val fields = JSONArray(listOf("id", "name", "percentDone", "status", "rateDownload", "rateUpload", "totalSize", "eta", "uploadRatio", "error", "labels", "addedDate", "leftUntilDone", "secondsSeeding"))
         val list = rpc("torrent-get", JSONObject().put("fields", fields)).arr("torrents").objects().map { o ->
             val st = o.int("status")
             DlItem(
@@ -376,6 +394,7 @@ class TransmissionClient(override val cfg: ServiceConfig) : DownloadClient {
                 dlSpeed = o.long("rateDownload"), upSpeed = o.long("rateUpload"), size = o.long("totalSize"),
                 eta = o.long("eta"), category = o.arr("labels").optString(0, ""), ratio = o.dbl("uploadRatio"),
                 error = o.int("error") != 0, addedOn = o.long("addedDate"),
+                seedTime = if (o.has("secondsSeeding")) o.long("secondsSeeding") else -1,
             )
         }
         val s = rpc("session-stats")
@@ -435,8 +454,14 @@ class DelugeClient(override val cfg: ServiceConfig) : DownloadClient {
 
     override suspend fun version() = "Deluge " + (call("daemon.info", JSONArray())?.toString() ?: "")
 
+    override val supportsSpeedLimit get() = true
+    override suspend fun setSpeedLimits(downKB: Long, upKB: Long) {
+        call("core.set_config", JSONArray().put(JSONObject().put("max_download_speed", if (downKB > 0) downKB.toDouble() else -1.0)
+            .put("max_upload_speed", if (upKB > 0) upKB.toDouble() else -1.0)))
+    }
+
     override suspend fun snapshot(): DlSnapshot {
-        val fields = JSONArray(listOf("name", "progress", "state", "download_payload_rate", "upload_payload_rate", "total_wanted", "eta", "ratio", "label", "time_added", "message"))
+        val fields = JSONArray(listOf("name", "progress", "state", "download_payload_rate", "upload_payload_rate", "total_wanted", "eta", "ratio", "label", "time_added", "message", "seeding_time"))
         val res = call("web.update_ui", JSONArray().put(fields).put(JSONObject())) as? JSONObject ?: JSONObject()
         val torrents = res.obj("torrents") ?: JSONObject()
         val list = torrents.keys().asSequence().mapNotNull { hash ->
@@ -448,6 +473,7 @@ class DelugeClient(override val cfg: ServiceConfig) : DownloadClient {
                 dlSpeed = o.long("download_payload_rate"), upSpeed = o.long("upload_payload_rate"),
                 size = o.long("total_wanted"), eta = o.long("eta").let { if (it <= 0) -1 else it },
                 category = o.str("label"), ratio = o.dbl("ratio"), error = st == "Error", addedOn = o.long("time_added"),
+                seedTime = if (o.has("seeding_time")) o.long("seeding_time") else -1,
             )
         }.toList()
         val stats = res.obj("stats")
@@ -593,6 +619,11 @@ class SabClient(override val cfg: ServiceConfig) : DownloadClient {
 
     override suspend fun version() = "SABnzbd " + api("version").str("version")
 
+    override val supportsSpeedLimit get() = true
+    override suspend fun setSpeedLimits(downKB: Long, upKB: Long) {
+        api("config", mapOf("name" to "speedlimit", "value" to if (downKB > 0) "${downKB}K" else "100"))
+    }
+
     private fun parseEta(t: String): Long {
         val p = t.split(":").mapNotNull { it.toLongOrNull() }
         return when (p.size) { 4 -> p[0] * 86400 + p[1] * 3600 + p[2] * 60 + p[3]; 3 -> p[0] * 3600 + p[1] * 60 + p[2]; 2 -> p[0] * 60 + p[1]; else -> -1 }
@@ -648,6 +679,9 @@ class NzbgetClient(override val cfg: ServiceConfig) : DownloadClient {
     }
 
     override suspend fun version() = "NZBGet " + rpc("version").toString()
+
+    override val supportsSpeedLimit get() = true
+    override suspend fun setSpeedLimits(downKB: Long, upKB: Long) { rpc("rate", JSONArray().put(downKB.toInt())) }
 
     override suspend fun snapshot(): DlSnapshot {
         val groups = (rpc("listgroups", JSONArray().put(0)) as? JSONArray ?: JSONArray()).objects()
