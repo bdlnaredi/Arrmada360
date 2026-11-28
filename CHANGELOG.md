@@ -4,9 +4,24 @@ All notable changes to Arrmada360 are listed here, newest first.
 Every successful build on `main` is published as **`Arrmada360.apk`** in the [latest release](../../releases/latest).
 The app version is `1.0.<build number>`. The build number is shown in *Settings* and in the release title.
 
-Builds #2, #5, #10, #15, #18, #19, #29, #33, #35 and #38 failed to compile in CI and were fixed straight away in builds #3, #6, #11, #16, #20, #30, #34, #36 and #39, so there is no APK for them.
+Builds #2, #5, #10, #15, #18, #19, #29, #33, #35, #38 and #44 failed to compile in CI and were fixed straight away in builds #3, #6, #11, #16, #20, #30, #34, #36 and #39, so there is no APK for them.
 
 ---
+
+## [1.0.44] – build #44
+
+### Added
+- **New first-run experience:**
+  1. **Welcome:** a floating logo wallpaper and every supported app.
+  2. **Which of these do you use?** Pick your apps from a grid, with select all or clear all.
+  3. **Getting things set up:** a short animated setup with a little about Arrmada360.
+  4. **You're all set:** connect each chosen app right there, or explore first.
+- **Welcome card on the dashboard:** an animated hand shows the gestures. Swipe right on the card for the menu, or left for downloads, or tap either circle.
+- **Finish connecting your apps:** a dashboard card for apps you picked but haven't connected yet.
+- **Tips carousel:** 8 tips (search, sharing, long-press, people, the Server tab, home and away, widgets, notifications) with Next and Hide.
+- **One-time screen tips** on the library, movie and show pages, downloads, Unraid and Stasharr.
+- **Downloads button** in the dashboard's top bar.
+- **Help & guides** (*Settings → Help*): replay the welcome tour, show all tips again, a "getting around" guide, and a per-app guide to the address and API key, with an Add button.
 
 ## [1.0.42] – build #42
 
