@@ -1,5 +1,6 @@
 package com.arrmada360.app.ui.screens
 
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Description
 
