@@ -84,6 +84,7 @@ sealed interface Route {
     data class Service(val id: String) : Route
     data class ArrDetail(val serviceId: String, val itemId: Int) : Route
     data object YearReview : Route
+    data object Help : Route
     data class StashScene(val serviceId: String, val sceneId: String) : Route
     data class Person(val id: Int, val name: String) : Route
     data class ClipFinder(val uri: String, val mime: String?) : Route
@@ -231,7 +232,7 @@ fun AppShell(pendingLink: String?, onLinkHandled: () -> Unit) {
 
 /** What family members are allowed to open. */
 private fun familyAllows(r: Route): Boolean = when (r) {
-    Route.Dashboard, Route.YearReview, Route.Changelog -> true
+    Route.Dashboard, Route.YearReview, Route.Changelog, Route.Help -> true
     is Route.ClipFinder, is Route.LinkLookup, is Route.ArrDetail, is Route.Person -> true
     is Route.Service -> com.arrmada360.app.data.Family.canOpen(r.id)
     is Route.Search -> true
@@ -247,6 +248,7 @@ private fun RouteContent(r: Route, nav: Navigator) {
         Route.Dashboard -> DashboardScreen(nav)
         is Route.ClipFinder -> com.arrmada360.app.ui.screens.ClipFinderScreen(r.uri, r.mime, nav, back)
         is Route.Person -> com.arrmada360.app.ui.screens.PersonScreen(r.id, r.name, nav, back)
+        Route.Help -> com.arrmada360.app.ui.screens.HelpScreen(nav, back)
         is Route.StashScene -> ConfigStore.get(r.serviceId)?.let { cfg ->
             ServiceTheme(cfg.type, ConfigStore.amoled) { com.arrmada360.app.ui.screens.StashSceneScreen(cfg, r.sceneId, nav, back) }
         } ?: EmptyBox("Service missing")

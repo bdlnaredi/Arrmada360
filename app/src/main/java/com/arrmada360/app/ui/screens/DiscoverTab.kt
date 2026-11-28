@@ -148,6 +148,7 @@ fun DiscoverTab(isMovie: Boolean, arr: ServiceConfig?, nav: Navigator) {
 
     LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
         if (!Discover.hasAnySource()) item { SourcesHint(nav) }
+        item(key = "guide") { DashboardGuideCards(nav) }
         item(key = "legend") { com.arrmada360.app.ui.StatusLegend(Modifier.padding(start = 16.dp, top = 8.dp)) }
         item(key = "hero") { HeroRow(trending, if (isMovie) "Trending movies" else "Trending shows", lib.data) { openItem = it } }
         if (arr != null) item(key = "recent") {

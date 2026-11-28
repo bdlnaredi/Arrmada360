@@ -87,7 +87,8 @@ import kotlinx.coroutines.launch
 
 // ============================================================ onboarding flow
 @Composable
-fun Onboarding() {
+@Suppress("unused")
+fun OnboardingLegacy() {
     var step by rememberSaveable { mutableIntStateOf(0) }
     var chosen by remember { mutableStateOf(listOf<ServiceType>()) }
     var index by rememberSaveable { mutableIntStateOf(0) }

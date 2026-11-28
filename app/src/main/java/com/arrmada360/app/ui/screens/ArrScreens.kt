@@ -414,6 +414,7 @@ fun LibraryTab(api: ArrApi, nav: Navigator, onOpen: ((Int) -> Unit)? = null) {
     androidx.activity.compose.BackHandler(selected.isNotEmpty()) { selected = emptySet() }
 
     Column {
+        ScreenTip("library", Icons.Filled.TouchApp, "Tap a poster to open it. Long-press posters to select several and monitor, search, tag or delete them together.")
         if (selected.isNotEmpty()) BulkBar(selected.size,
             onAll = { selected = (l.data ?: emptyList()).map { it.id }.toSet() },
             onClear = { selected = emptySet() },
@@ -819,6 +820,7 @@ fun ArrDetailScreen(cfg: ServiceConfig, itemId: Int, nav: Navigator, back: () ->
                     }
                 }
                 item { FactsRow(cfg, m) }
+                item { ScreenTip("detail", Icons.Filled.Lightbulb, "Search finds the best release automatically, Interactive lets you pick one yourself, and Edit changes quality or tags. Tap anyone in the cast for their filmography.") }
                 if (cfg.type != ServiceType.WHISPARR) item { com.arrmada360.app.ui.screens.TrailerAndStreaming(api, m, nav) }
                 if (m.overview.isNotEmpty()) item {
                     Text(

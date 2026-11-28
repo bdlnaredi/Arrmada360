@@ -193,6 +193,7 @@ private fun StashOverview(api: StashApi) {
     val run = rememberRunner()
     LoadableContent(st) { s ->
         LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { ScreenTip("stash", Icons.Filled.Image, "Screenshots and performer photos are hidden until you turn on Show artwork in the Server tab. Tap a scene for its details.", StashBlue) }
             item {
                 Panel(Modifier.fillMaxWidth(), tint = StashBlue) {
                     Column(Modifier.padding(16.dp)) {

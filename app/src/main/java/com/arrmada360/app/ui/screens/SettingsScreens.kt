@@ -409,8 +409,8 @@ fun SettingsScreen(nav: Navigator, isRoot: Boolean, back: () -> Unit) {
             item {
                 GroupTitle("Help")
                 SettingsCard {
-                    SettingLink(Icons.Filled.HelpOutline, "Help center", "Setup guide, API keys, troubleshooting", tint = MaterialTheme.colorScheme.onSurface) {
-                        uri.openUri("https://github.com/${com.arrmada360.app.api.Updates.REPO}#readme")
+                    SettingLink(Icons.Filled.HelpOutline, "Help & guides", "How to use the app, connect each service, replay the tour", tint = MaterialTheme.colorScheme.onSurface) {
+                        nav.push(Route.Help)
                     }
                     SettingLink(Icons.Filled.Article, "Logging center", "Last crash log on this phone", tint = MaterialTheme.colorScheme.onSurface) {
                         val f = File(ctx.filesDir, "crash.txt"); crashText = if (f.exists()) f.readText() else ""

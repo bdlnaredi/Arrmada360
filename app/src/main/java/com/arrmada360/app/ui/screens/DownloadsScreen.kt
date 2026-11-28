@@ -259,6 +259,7 @@ fun DownloadsScreen(cfg: ServiceConfig, nav: com.arrmada360.app.ui.Navigator, is
                     }
                     androidx.compose.runtime.LaunchedEffect(shown) { visibleIds = shown.map { it.id } }
                     LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item { com.arrmada360.app.ui.screens.ScreenTip("downloads", androidx.compose.material.icons.Icons.Filled.Swipe, "Swipe a download right to pause or resume it and left to delete it. Long-press to select several and change category, pause or delete.") }
                         items(shown, key = { it.id }) { item ->
                             val sel = item.id in selection
                             SwipeRow(

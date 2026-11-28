@@ -1,6 +1,7 @@
 package com.arrmada360.app.ui.screens
 
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Downloading
 import androidx.compose.material.icons.filled.ImageSearch
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Schedule
@@ -154,6 +155,11 @@ fun DashboardScreen(nav: Navigator) {
         isRoot = true, onBack = {},
         tabs = if (instances.size > 1 && !searching) instances.map { it.name } else emptyList(), selectedTab = pick, onTab = { pick = it },
         titleContent = { DashboardSearchBar(query, { query = it }) },
+        actions = {
+            if (services.any { it.type.isDownloader }) IconButton(onClick = { openDownloads(nav) }) {
+                Icon(androidx.compose.material.icons.Icons.Filled.Downloading, "Downloads", tint = MaterialTheme.colorScheme.onSurface)
+            }
+        },
         bottomTabs = listOf(
             BottomTab("Movies", Icons.Filled.Movie),
             BottomTab("TV Shows", Icons.Filled.Tv),

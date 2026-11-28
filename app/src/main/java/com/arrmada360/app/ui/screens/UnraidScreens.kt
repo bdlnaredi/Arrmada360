@@ -159,6 +159,7 @@ private fun UnraidDashboard(api: UnraidApi, nav: Navigator, goTab: (Int) -> Unit
     }
     LoadableContent(l) { d ->
         LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item { com.arrmada360.app.ui.screens.ScreenTip("unraid", androidx.compose.material.icons.Icons.Filled.Dns, "Use the tabs below for the array, Docker, VMs and shares. Live graphs and Logs are right here; container logs are in each container's ⋮ menu.") }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Panel(Modifier.weight(1f), tint = Accent, onClick = { nav.push(Route.UnraidLive(api.cfg.id)) }) {
