@@ -4,7 +4,7 @@ All notable changes to Arrmada360 are listed here, newest first.
 Every successful build on `main` is published as **`Arrmada360.apk`** in the [latest release](../../releases/latest).
 The app version is `1.0.<build number>`. The build number is shown in *Settings* and in the release title.
 
-Builds #2, #5, #10, #15, #18, #19, #29, #33, #35, #38 and #44 failed to compile in CI and were fixed straight away in builds #3, #6, #11, #16, #20, #30, #34, #36 and #39, so there is no APK for them.
+Builds #2, #5, #10, #15, #18, #19, #29, #33, #35, #38 and #43 failed to compile in CI and were fixed straight away in builds #3, #6, #11, #16, #20, #30, #34, #36 and #39, so there is no APK for them.
 
 ---
 
